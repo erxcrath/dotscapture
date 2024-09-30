@@ -5,6 +5,29 @@ let currentTurn;
 
 console.log("Initializing game variables");
 
+// Fonction pour initialiser les points au centre
+function initializeCenterPoints() {
+  const centerX = Math.floor(MAX_X / 2);
+  const centerY = Math.floor(MAX_Y / 2);
+
+  // Créer les points
+  const redDot1 = new Dot(1, centerX - 1, centerY - 1);
+  const redDot2 = new Dot(1, centerX + 0, centerY + 0);
+  const blueDot1 = new Dot(2, centerX - 1, centerY + 0);
+  const blueDot2 = new Dot(2, centerX + 0, centerY - 1);
+
+  // Ajouter les points aux tableaux correspondants
+  reddots[centerX - 1][centerY - 1] = redDot1;
+  reddots[centerX + 0][centerY + 0] = redDot2;
+  bluedots[centerX - 1][centerY + 0] = blueDot1;
+  bluedots[centerX + 0][centerY - 1] = blueDot2;
+
+  // Ajouter les points au tableau render
+  render.push(redDot1, redDot2, blueDot1, blueDot2);
+
+  console.log("Initialized center points");
+}
+
 function matrixArray(rows, columns) {
   var arr = new Array();
   for (var i = 0; i < rows; i++) {
@@ -63,11 +86,19 @@ socket.on('gameJoined', (data) => {
   console.log(`Joined game as ${playerType}`);
   console.log(`Initial game state:`, gameState);
 
-  for (let dot of render) {
-    if (dot.type === 'red') {
-      reddots[dot.x][dot.y] = new Dot(1, dot.x, dot.y);
-    } else {
-      bluedots[dot.x][dot.y] = new Dot(2, dot.x, dot.y);
+  // Si le tableau de points est vide, initialiser les points centraux
+  if (render.length === 0) {
+    initializeCenterPoints();
+    // Mettre à jour l'état du jeu sur le serveur
+    socket.emit('updateGameState', { gameId, dots: render });
+  } else {
+    // Sinon, initialiser les tableaux reddots et bluedots avec les points existants
+    for (let dot of render) {
+      if (dot.type === 'red') {
+        reddots[dot.x][dot.y] = new Dot(1, dot.x, dot.y);
+      } else {
+        bluedots[dot.x][dot.y] = new Dot(2, dot.x, dot.y);
+      }
     }
   }
 });

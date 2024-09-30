@@ -4,13 +4,40 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>Game</title>
+  
   <!-- Bootstrap CSS -->
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="sketch.js"></script>
+
 </head>
 <body>
+  <header class="bg-white shadow-sm">
+    <div class="container-fluid py-2">
+        <div class="row align-items-center">
+            <div class="col-md-3 d-flex align-items-center">
+                <img src="faritany.jpg" alt="Faritany logo" class="me-2" width="40" height="40">
+                <input type="text" placeholder="Rechercher sur Faritany" class="form-control form-control-sm rounded-pill">
+            </div>
+            <nav class="col-md-6">
+                <ul class="nav justify-content-center">
+                    <li class="nav-item"><a href="accueil.html" class="nav-link text-primary">Accueil</a></li>
+                    <li class="nav-item"><a href="game.html" class="nav-link">Matchs</a></li>
+                    <li class="nav-item"><a href="#" class="nav-link">Joueurs a suivre</a></li>
+                </ul>
+            </nav>
+            <div class="col-md-3 d-flex justify-content-end">
+                <img src="goku.jpg" alt="Profil" class="rounded-circle me-2" width="32" height="32">
+                <img src="message.png" alt="Menu" width="32" height="32">
+                <img src="notification.png" alt="Notifications" class="me-2" width="32" height="32">
+
+                <button class="btn btn-outline-danger btn-sm">Déconnexion</button>                    
+            </div>
+            
+        </div>
+    </div>
+</header>
   <div class="container mt-5">
     <div class="row mb-3">
       <div class="col-md-6">
