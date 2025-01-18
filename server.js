@@ -3,6 +3,18 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const mysql = require('mysql');
+const connection = mysql.createConnection(process.env.JAWSDB_URL);
+
+// En cas d'erreur de connexion, il est préférable de la gérer proprement
+connection.connect((err) => {
+  if (err) {
+    console.error('Erreur de connexion à la base de données :', err);
+    return;
+  }
+  console.log('Connecté à la base de données MySQL');
+});
+
+
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const bodyParser = require('body-parser');
