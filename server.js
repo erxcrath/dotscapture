@@ -7,66 +7,26 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 
-// Configuration du port pour Heroku
+// Configuration du port
 const PORT = process.env.PORT || 3000;
 
-// Configuration de la session
+// Configurer la session Express
 const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || 'secret',
+    secret: 'secret',
     resave: false,
-    saveUninitialized: true,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production'
-    }
+    saveUninitialized: true
 });
 
-// Variables pour le suivi des joueurs et des parties
+// Garder une trace des joueurs en ligne
 const onlinePlayers = new Map();
 const games = {};
-const matchRequests = new Map();
+
+// Ajouter ces variables au début du fichier, après la déclaration des autres variables
+const matchRequests = new Map(); // Pour stocker les demandes de match en cours
 
 // Utiliser la session dans Express
 app.use(sessionMiddleware);
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static('public'));
-
-// Configuration de la base de données MySQL
-const db = mysql.createPool({
-    host: 'p1us8ottbqwio8hv.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
-    user: 'scqj3qxbqpxgsuyv',
-    password: 'exv19cov8xhd8whr',
-    database: 'x0vl5rnbu88niera',
-    port: 3306,
-    connectionLimit: 10,
-    ssl: process.env.NODE_ENV === 'production'
-});
-
-db.getConnection((err, connection) => {
-    if (err) {
-        console.error('Erreur de connexion à la base de données:', err);
-        return;
-    }
-    console.log('Connexion MySQL établie avec succès...');
-
-    const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS users (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(255) NOT NULL UNIQUE,
-            password VARCHAR(255) NOT NULL,
-            score INT DEFAULT 0,
-            games_played INT DEFAULT 0
-        )
-    `;
-    
-    connection.query(createTableQuery, (err) => {
-        connection.release();
-        if (err) {
-            console.error('Erreur lors de la création de la table:', err);
-            return;
-        }
-        console.log('Table users vérifiée/créée avec succès');
-    });
-});
 
 // Middleware d'authentification
 function requireLogin(req, res, next) {
@@ -84,7 +44,13 @@ app.use((req, res, next) => {
     }
 });
 
-
+// Configuration de MySQL
+const db = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: '',
+    database: 'circle_game'
+});
 
 db.connect((err) => {
     if (err) throw err;
