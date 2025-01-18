@@ -3,237 +3,499 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facebook Interface</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    <header class="bg-white shadow-sm">
-        <div class="container-fluid py-2">
-            <div class="row align-items-center">
-                <div class="col-md-3 d-flex align-items-center">
-                    <img src="faritany.jpg" alt="Faritany logo" class="me-2" width="40" height="40">
-                    <input type="text" placeholder="Rechercher sur Faritany" class="form-control form-control-sm rounded-pill">
-                </div>
-                <nav class="col-md-6">
-                    <ul class="nav justify-content-center">
-                        <li class="nav-item"><a href="#" class="nav-link text-primary">Accueil</a></li>
-                        <li class="nav-item"><a href="game.html" class="nav-link">Matchs</a></li>
-                        <li class="nav-item"><a href="#" class="nav-link">Joueurs a suivre</a></li>
-                    </ul>
-                </nav>
-                <div class="col-md-3 d-flex justify-content-end">
-                    <img src="goku.jpg" alt="Profil" class="rounded-circle me-2" width="32" height="32">
-                    <img src="message.png" alt="Menu" width="32" height="32">
-                    <img src="notification.png" alt="Notifications" class="me-2" width="32" height="32">
+    <title>Accueil - Jeu de Points</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
 
-                    <button class="btn btn-outline-danger btn-sm">Déconnexion</button>                    
-                </div>
-                
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background-color: white;
+            padding: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .navbar-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100%;
+            max-width: 200px;
+        }
+
+        button, .btn-disconnect {
+            min-width: 90px;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .btn-join {
+            background-color: #4285f4;
+            color: white;
+        }
+
+        .btn-create {
+            background-color: #34a853;
+            color: white;
+        }
+
+        .btn-disconnect {
+            background-color: #ea4335;
+            color: white;
+            display: inline-block;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            padding: 15px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #202124;
+        }
+
+        .player-card {
+            padding: 12px;
+            border-bottom: 1px solid #e8eaed;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .player-card:active {
+            background-color: #f1f3f4;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            text-align: left;
+            padding: 8px;
+            color: #5f6368;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #e8eaed;
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #e8eaed;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            padding: 15px;
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .close-modal {
+            position: absolute;
+            right: 15px;
+            top: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 5px;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 1100;
+            text-align: center;
+        }
+
+        .notification-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .accept-btn, .decline-btn {
+            flex: 1;
+            max-width: 120px;
+            padding: 8px;
+        }
+
+        .accept-btn {
+            background-color: #34a853;
+            color: white;
+        }
+
+        .decline-btn {
+            background-color: #ea4335;
+            color: white;
+        }
+
+        .request-game {
+            background-color: #4285f4;
+            color: white;
+            width: 100%;
+            margin-top: 15px;
+            padding: 10px;
+        }
+
+        @media (min-width: 768px) {
+            .content {
+                grid-template-columns: repeat(2, 1fr);
+                padding: 20px;
+            }
+
+            .navbar {
+                padding: 15px 20px;
+            }
+
+            .notification {
+                top: 20px;
+                bottom: auto;
+                right: 20px;
+                left: auto;
+                transform: none;
+                width: auto;
+            }
+
+            .modal-content {
+                margin: 15% auto;
+                padding: 25px;
+            }
+
+            button, .btn-disconnect {
+                min-width: 100px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .controls {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            input, button, .btn-disconnect {
+                width: 100%;
+                max-width: none;
+            }
+
+            .navbar-content {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .title {
+                text-align: center;
+                margin-bottom: 10px;
+            }
+
+            th, td {
+                padding: 6px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="title">Jeu de Points</div>
+            <div class="controls">
+                <input type="text" id="gameId" placeholder="ID de la partie">
+                <button onclick="joinGame()" class="btn-join">Rejoindre</button>
+                <button onclick="createGame()" class="btn-create">Créer</button>
+                <a href="/logout" class="btn-disconnect">Déconnexion</a>
             </div>
         </div>
-    </header>
-    
-    <main class="container-fluid mt-4">
-        <div class="row">
-            <aside class="col-md-3">
-                <img src="goku.jpg"  class=" rounded-circle" width="150" height="150">
-                <img src="madagascar.jpg"  class=" rounded-circle" width="150" height="150">
-                <h3 class="mt-4 fw-bold">AZURA</h3>
-                <ul class="list-unstyled">
-                   
-                    <li>ELO 1219</li>
-                    <li>classé 42eme sur Faritany</li>
-                    
-                </ul>
-                <h3 class="mt-4 fw-bold">Vos trophés</h3>
-                <ul class="list-unstyled">
-                    <li>MILA DINIHINA</li>
-                    
-                </ul>
-            </aside>
-            
-            <section class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h2 class="card-title fw-bold mb-3">Quoi de neuf, AZURA ?</h2>
-                        <div class="d-flex">
-                            <button class="btn btn-danger me-2">Vidéo en direct</button>
-                            <button class="btn btn-success me-2">Photo / vidéo</button>
-                            <button class="btn btn-warning">Humeur / activité</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center mb-3">
-                            <div>
-                                <h3 class="fw-bold mb-0">Classement TOP 10</h3>
-                            </div>
-                        </div>
-                        <img src="pharaon.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="bob.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="goku.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="panda.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="fitahiana.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="RAPP.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="toky.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="arsene.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="enigma.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="eclair style.png"  class="rounded-circle me-2" width="70" height="70">
-                        
-                    </div>
-                    
-                    
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center mb-3">
-                            <div>
-                                <h3 class="fw-bold mb-0">Joueurs connectés</h3>
-                            </div>
-                        </div>
-                        <img src="toky.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        
-                        <img src="goku.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="bob.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="RAPP.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="panda.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="pharaon.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        
-                        
-                        <img src="arsene.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="enigma.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="eclair style.png"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="real.jpg"  class="rounded-circle me-2" width="70" height="70">
-                        <img src="fitahiana.jpg"  class="rounded-circle me-2" width="70" height="70">
+    </nav>
 
-                        
-            </section>
-            
-            <aside class="col-md-3">
-
-                <div class="card mb-4">
-                    <div class="card-body">
-                        
-                        
-                        <h3 class="fw-bold mb-3">Invitations de match</h3>
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div class="text-center">
-                                    <img src="toky.jpg" class="rounded-circle me-0" width="70" height="70">
-                                    <p class="text-primary fw-bold mb-0">TOKY</p>
-
-                            </div>
-                            <div>
-                                <button class="btn btn-primary btn-sm me-1">Confirmer </button>
-                                <button class="btn btn-secondary btn-sm">Annuler si vous avez peur</button>
-                            </div>
-                        </div>
-
-                            <h3 class="fw-bold mb-3">Vos historiques de points</h3>
-                            <table class="table">
-                                <tr>
-                                    <td><span class="fw-bold">ELO 1219</span></td> 
-                                    <td class="text-end"><span class="badge bg-danger fs-5">-10</span></td>
-                                </tr>
-                                <tr>
-                                    <td><span class="fw-bold">ELO 1229</span></td> 
-                                    <td class="text-end"><span class="badge bg-success fs-5">+13</span></td>
-                                </tr>
-                                <tr>
-                                    <td><span class="fw-bold">ELO 1216</span></td> 
-                                    <td class="text-end"><span class="badge bg-success fs-5">+12</span></td>
-                                </tr>
-                            </table>
-                            
-
-                        
-                    </div>
-                </div>
-
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h3 class="fw-bold mb-3">MATCHS</h3>
-                        <div class="mb-3">
-                            <table class="table">
-                                <tr>
-                                    <td>
-                                        <div class="text-center">
-                                            <img src="arsene.jpg" class="rounded-circle me-2" width="70" height="70">
-                                            <p class="text-primary fw-bold mb-0">ARSENE</p>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="text-center">
-                                            <img src="eclair.png" alt="éclair" width="80" height="80">
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="text-center">
-                                            <img src="toky.jpg" class="rounded-circle me-2" width="70" height="70">
-                                            <p class="text-primary fw-bold mb-0">TOKY</p>
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <button class="btn btn-success btn-sm">Analyser</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div class="text-center">
-                                            <img src="pharaon.jpg" class="rounded-circle me-2" width="70" height="70">
-                                            <p class="text-primary fw-bold mb-0">PHARAON</p>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="text-center">
-                                            <img src="eclair.png" alt="éclair" width="80" height="80">
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="text-center">
-                                            <img src="eclair style.png" class="rounded-circle me-2" width="70" height="70">
-                                            <p class="text-primary fw-bold mb-0">HASINA</p>
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <button class="btn btn-success btn-sm">Analyser</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div class="text-center">
-                                            <img src="enigma.jpg" class="rounded-circle me-2" width="70" height="70">
-                                            <p class="text-primary fw-bold mb-0">ENIGMA</p>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="text-center">
-                                            <img src="eclair.png" alt="éclair" width="80" height="80">
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="text-center">
-                                            <img src="rapp.jpg" class="rounded-circle me-2" width="70" height="70">
-                                            <p class="text-primary fw-bold mb-0">RAPP</p>
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <button class="btn btn-success btn-sm">Analyser</button>
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                            
-                        </div>
-                    </div>
-                </div>
-                
-
-            </aside>
+    <div class="content">
+        <div class="card">
+            <h2 class="card-title">Joueurs en ligne (0)</h2>
+            <div id="online-players">
+                <div class="loading-text">Chargement des joueurs...</div>
+            </div>
         </div>
-    </main>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+        <div class="card">
+            <h2 class="card-title">Classement</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>JOUEUR</th>
+                            <th>SCORE</th>
+                            <th>PARTIES</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard">
+                        <tr>
+                            <td colspan="4" class="loading-text">Chargement du classement...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="playerModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h2 id="modalPlayerName"></h2>
+            <div class="player-stats">
+                <div>Score total : <span id="modalPlayerScore">0</span></div>
+                <div>Parties jouées : <span id="modalPlayerGames">0</span></div>
+                <div>Ratio victoires : <span id="modalPlayerRatio">0%</span></div>
+            </div>
+            <button id="requestGameBtn" class="request-game" onclick="requestGame()">
+                Demander un match
+            </button>
+        </div>
+    </div>
+
+    <div id="matchRequest" class="notification">
+        <span id="requestText"></span>
+        <div class="notification-buttons">
+            <button class="accept-btn" onclick="acceptMatch()">Accepter</button>
+            <button class="decline-btn" onclick="declineMatch()">Refuser</button>
+        </div>
+    </div>
+
+    <script>
+        // Le même code JavaScript que précédemment
+        const socket = io();
+        let selectedPlayer = null;
+        const modal = document.getElementById('playerModal');
+        const matchRequest = document.getElementById('matchRequest');
+
+        function joinGame() {
+            const gameId = document.getElementById('gameId').value;
+            if (gameId) {
+                socket.emit('joinGame', gameId);
+            }
+        }
+
+        function createGame() {
+            socket.emit('createGame');
+        }
+
+        function showPlayerModal(player) {
+            selectedPlayer = player;
+            document.getElementById('modalPlayerName').textContent = player.username;
+            document.getElementById('modalPlayerScore').textContent = player.score || 0;
+            document.getElementById('modalPlayerGames').textContent = player.games_played || 0;
+            document.getElementById('modalPlayerRatio').textContent = 
+                `${player.games_played ? Math.round((player.score / player.games_played) * 100) : 0}%`;
+            
+            const requestBtn = document.getElementById('requestGameBtn');
+            requestBtn.disabled = player.inGame;
+            
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            modal.style.display = 'none';
+            selectedPlayer = null;
+        }
+
+        function requestGame() {
+            if (selectedPlayer) {
+                socket.emit('requestMatch', {
+                    toPlayer: selectedPlayer.username
+                });
+                closeModal();
+            }
+        }
+
+        function showMatchRequest(fromPlayer) {
+            const requestText = document.getElementById('requestText');
+            requestText.textContent = `${fromPlayer} vous défie !`;
+            matchRequest.style.display = 'block';
+        }
+
+        function acceptMatch() {
+            socket.emit('acceptMatch');
+            matchRequest.style.display = 'none';
+        }
+
+        function declineMatch() {
+            socket.emit('declineMatch');
+            matchRequest.style.display = 'none';
+        }
+
+        socket.on('connect', () => {
+            console.log('Connecté au serveur');
+            socket.emit('requestOnlinePlayers');
+            socket.emit('requestLeaderboard');
+        });
+
+        socket.on('updateOnlinePlayers', (players) => {
+            const container = document.getElementById('online-players');
+            document.querySelector('.card-title').textContent = `Joueurs en ligne (${players.length})`;
+            
+            if (!players.length) {
+                container.innerHTML = '<div class="loading-text">Aucun joueur en ligne</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            players.forEach(player => {
+                const div = document.createElement('div');
+                div.className = 'player-card';
+                div.innerHTML = `
+                    ${player.username} ${player.inGame ? ' (En partie)' : ''}
+                `;
+                div.onclick = () => showPlayerModal(player);
+                container.appendChild(div);
+            });
+        });
+
+        socket.on('updateLeaderboard', (leaderboard) => {
+            const tbody = document.getElementById('leaderboard');
+            
+            if (!leaderboard || leaderboard.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="loading-text">Aucune donnée disponible</td>
+                    </tr>`;
+                return;
+            }
+
+            tbody.innerHTML = '';
+            leaderboard.forEach((player, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${player.username}</td>
+                        <td>${player.score || 0}</td>
+                        <td>${player.games_played || 0}</td>
+                    </tr>
+                `;
+            });
+        });
+
+        socket.on('matchRequest', (data) => {
+            showMatchRequest(data.fromPlayer);
+        });
+
+        socket.on('gameJoined', (data) => {
+            localStorage.setItem('gameId', data.gameId);
+            localStorage.setItem('playerType', data.playerType);
+            window.location.href = '/game';
+        });
+
+        socket.on('matchAccepted', (gameId) => {
+            document.getElementById('gameId').value = gameId;
+            joinGame();
+        });
+
+        socket.on('gameFull', () => {
+            alert('Cette partie est déjà complète !');
+        });
+
+        socket.on('notAuthenticated', () => {
+            window.location.href = '/login';
+        });
+
+        socket.on('matchDeclined', (player) => {
+            alert(`${player} a décliné votre demande de match.`);
+        });
+
+        window.onclick = (event) => {
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        setInterval(() => {
+            socket.emit('requestOnlinePlayers');
+            socket.emit('requestLeaderboard');
+        }, 5000);
+
+        // Ajout d'un gestionnaire pour le clic tactile
+        document.addEventListener('touchstart', function(e) {
+            if (e.target == modal) {
+                closeModal();
+            }
+        });
+    </script>
 </body>
 </html>

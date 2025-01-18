@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Game</title>
+  
+  <!-- CSS -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    #gameCanvas {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 20px;
+      min-height: 400px;
+    }
+    canvas {
+      border: 1px solid #ddd;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .game-info {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <header class="bg-white shadow-sm">
+    <div class="container-fluid py-2">
+      <div class="row align-items-center">
+        <div class="col-md-3 d-flex align-items-center">
+          <img src="faritany.jpg" alt="Faritany logo" class="me-2" width="40" height="40">
+          <input type="text" placeholder="Rechercher sur Faritany" class="form-control form-control-sm rounded-pill">
+        </div>
+        <nav class="col-md-6">
+          <ul class="nav justify-content-center">
+            <li class="nav-item"><a href="/accueil" class="nav-link text-primary">Accueil</a></li>
+            <li class="nav-item"><a href="/game" class="nav-link">Matchs</a></li>
+            <li class="nav-item"><a href="#" class="nav-link">Joueurs a suivre</a></li>
+          </ul>
+        </nav>
+        <div class="col-md-3 d-flex justify-content-end">
+          <img src="goku.jpg" alt="Profil" class="rounded-circle me-2" width="32" height="32">
+          <img src="message.png" alt="Menu" width="32" height="32">
+          <img src="notification.png" alt="Notifications" class="me-2" width="32" height="32">
+          <a href="/logout" class="btn btn-outline-danger btn-sm">Déconnexion</a>                    
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container mt-5">
+    <div class="game-info">
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <input type="text" class="form-control" id="gameId" placeholder="Enter Game ID" readonly>
+        </div>
+        <div class="col-md-6">
+          <button class="btn btn-primary" onclick="joinGame()">Join Game</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="alert alert-danger" role="alert">
+            Score Red: <span id="RED">0</span>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="alert alert-primary" role="alert">
+            Score Blue: <span id="BLUE">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- <div id="gameCanvas"></div>--> 
+    <div id="gameSVG"></div>
+  </div>
+
+  <!-- Scripts dans l'ordre correct -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Configuration Socket.IO globale
+    const socket = io();
+    let gameId = localStorage.getItem('gameId');
+    let playerType = localStorage.getItem('playerType');
+    let gameStarted = false;
+
+    // Mettre l'ID de partie dans le champ
+    if (gameId) {
+      document.getElementById('gameId').value = gameId;
+    }
+
+    // Fonction de connexion à une partie
+    function joinGame() {
+      gameId = document.getElementById('gameId').value;
+      if (gameId) {
+        console.log('Tentative de rejoindre la partie:', gameId);
+        socket.emit('joinGame', gameId);
+      }
+    }
+
+    // Rejoindre automatiquement si on a déjà un ID
+    if (gameId && playerType && !gameStarted) {
+      console.log('Rejoindre automatiquement la partie:', gameId);
+      joinGame();
+    }
+
+    // Événements Socket.IO
+    socket.on('gameJoined', (data) => {
+      console.log('Partie rejointe:', data);
+      localStorage.setItem('gameId', data.gameId);
+      localStorage.setItem('playerType', data.playerType);
+      document.getElementById('gameId').value = data.gameId;
+      gameStarted = true;
+    });
+
+    socket.on('gameStart', (gameState) => {
+      console.log('La partie commence:', gameState);
+      gameStarted = true;
+    });
+
+    socket.on('dotPlaced', (data) => {
+      console.log('Point placé:', data);
+    });
+
+    socket.on('turnChange', (newTurn) => {
+      console.log('Changement de tour:', newTurn);
+    });
+
+    socket.on('scoreUpdated', (data) => {
+      document.getElementById('RED').textContent = data.scoreRed;
+      document.getElementById('BLUE').textContent = data.scoreBlue;
+    });
+
+    socket.on('playerDisconnected', () => {
+      alert('Un joueur s\'est déconnecté');
+      localStorage.removeItem('gameId');
+      localStorage.removeItem('playerType');
+      window.location.href = '/accueil';
+    });
+
+    // Nettoyage
+    window.onbeforeunload = () => {
+      if (gameStarted) {
+        socket.emit('playerLeft', gameId);
+      }
+    };
+  </script>
+  
+  <!-- Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  
+  <!-- Sketch.js chargé en dernier -->
+  <script src="game.js"></script>
+</body>
+</html>
