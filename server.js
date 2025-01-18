@@ -26,7 +26,7 @@ const games = {};
 const matchRequests = new Map();
 
 // Utiliser la session dans Express
-pp.use(sessionMiddleware);
+app.use(sessionMiddleware);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
