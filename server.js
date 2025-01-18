@@ -3,16 +3,31 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const mysql = require('mysql');
-const connection = mysql.createConnection(process.env.JAWSDB_URL);
 
-// En cas d'erreur de connexion, il est préférable de la gérer proprement
+const connection = mysql.createConnection({
+  host: 'nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
+  user: 'ye6uqbklz9f468mx',
+  password: 'r134fmdymstrxf6k',
+  database: 'c5rshxhi3vu5jefu',
+  port: 3306
+});
+
+// Gestion plus sécurisée de la connexion
 connection.connect((err) => {
   if (err) {
     console.error('Erreur de connexion à la base de données :', err);
+    // Logger l'erreur mais ne pas arrêter l'application
     return;
   }
-  console.log('Connecté à la base de données MySQL');
+  console.log('Connecté avec succès à la base de données');
 });
+// Gestion des erreurs de connexion
+connection.on('error', (err) => {
+    console.error('Erreur de base de données :', err);
+    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+      console.log('Tentative de reconnexion à la base de données...');
+    }
+  });
 
 
 const bcrypt = require('bcryptjs');
@@ -58,10 +73,11 @@ app.use((req, res, next) => {
 
 // Configuration de MySQL
 const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'circle_game'
+    host: 'nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
+    user: 'ye6uqbklz9f468mx',
+    password: 'r134fmdymstrxf6k',
+    database: 'c5rshxhi3vu5jefu',
+    port: 3306
 });
 
 db.connect((err) => {
