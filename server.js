@@ -2,14 +2,32 @@ const express = require("express");
 const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
-const mysql = require("mysql2");
+const MySQLStore = require('express-mysql-session')(session);
 
-const db = mysql.createConnection({
+// Modifiez la configuration de la base de données pour utiliser l'URL JAWSDB de Heroku
+const dbConfig = process.env.JAWSDB_URL ? {
+  url: process.env.JAWSDB_URL
+} : {
   host: "nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
   user: "q8r1hkm9a97oecvz",
   password: "gz2nl6w62xwddq0w",
   database: "qwkya7d3q2yxhzzu",
-  port: 3306,
+  port: 3306
+};
+
+// Créer le store de session MySQL
+const sessionStore = new MySQLStore(dbConfig);
+
+// Modifier la configuration de la session
+const sessionMiddleware = session({
+  secret: "secret",
+  resave: false,
+  saveUninitialized: false,
+  store: sessionStore,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 24 * 60 * 60 * 1000 // 24 heures
+  }
 });
 
 // Connexion à la base de données
@@ -55,16 +73,6 @@ const bodyParser = require("body-parser");
 // Configuration du port
 const PORT = process.env.PORT || 3000;
 
-// Configurer la session Express
-const sessionMiddleware = session({
-  secret: "secret",
-  resave: true,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 24 * 60 * 60 * 1000, // 24 heures
-  },
-});
 
 // Garder une trace des joueurs en ligne
 const onlinePlayers = new Map();
@@ -122,11 +130,48 @@ app.get('/', (req, res) => {
   }
 });
 
-app.get('/accueil', (req, res) => {
-  if (req.session && req.session.loggedin) {
-    res.sendFile(__dirname + '/public/accueil.html');
+// Ajouter des logs pour le débogage
+app.post("/login", (req, res) => {
+  const { username, password } = req.body;
+  console.log('Tentative de connexion pour:', username);
+  
+  if (username && password) {
+    db.query(
+      "SELECT * FROM users WHERE username = ?",
+      [username],
+      (err, results) => {
+        if (err) {
+          console.error('Erreur SQL:', err);
+          throw err;
+        }
+        if (results.length > 0) {
+          bcrypt.compare(password, results[0].password, (err, match) => {
+            if (match) {
+              console.log('Connexion réussie pour:', username);
+              req.session.loggedin = true;
+              req.session.username = username;
+              req.session.save((err) => {
+                if (err) {
+                  console.error('Erreur de sauvegarde de session:', err);
+                  res.status(500).send('Erreur de session');
+                } else {
+                  res.redirect("/accueil");
+                }
+              });
+            } else {
+              console.log('Mot de passe incorrect pour:', username);
+              res.status(401).send("Incorrect password!");
+            }
+          });
+        } else {
+          console.log('Utilisateur non trouvé:', username);
+          res.status(404).send("User not found");
+        }
+      }
+    );
   } else {
-    res.redirect('/login');
+    console.log('Données de connexion manquantes');
+    res.status(400).send("Please enter username and password");
   }
 });
 
