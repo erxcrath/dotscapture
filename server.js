@@ -181,6 +181,29 @@ app.post("/login", (req, res) => {
     res.status(400).send("Please enter username and password");
   }
 });
+app.get('/accueil', (req, res) => {
+  console.log('Tentative d\'accès à /accueil');
+  console.log('Session:', req.session);
+  console.log('LoggedIn:', req.session?.loggedin);
+  console.log('Directory:', __dirname);
+  
+  if (req.session && req.session.loggedin) {
+    const filePath = __dirname + '/public/accueil.html';
+    console.log('Chemin du fichier:', filePath);
+    
+    // Vérifier si le fichier existe
+    if (require('fs').existsSync(filePath)) {
+      console.log('Le fichier accueil.html existe');
+      res.sendFile(filePath);
+    } else {
+      console.log('Le fichier accueil.html n\'existe pas');
+      res.status(404).send('Page non trouvée');
+    }
+  } else {
+    console.log('Utilisateur non authentifié, redirection vers /login');
+    res.redirect('/login');
+  }
+});
 
 app.get('/login', (req, res) => {
   res.sendFile(__dirname + '/public/login.html');
