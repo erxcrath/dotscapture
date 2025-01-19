@@ -4,7 +4,7 @@ const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 const mysql = require('mysql2');
 
-const connection = mysql.createConnection({
+const db = mysql.createConnection({
   host: "nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
   user: "ps1kpfyd3i89t694",
   password: "ooaqgb5ns363c0a3",
@@ -40,17 +40,8 @@ db.connect((err) => {
   });
 });
 
-// Gestion plus sécurisée de la connexion
-connection.connect((err) => {
-  if (err) {
-    console.error("Erreur de connexion à la base de données :", err);
-    // Logger l'erreur mais ne pas arrêter l'application
-    return;
-  }
-  console.log("Connecté avec succès à la base de données");
-});
 // Gestion des erreurs de connexion
-connection.on("error", (err) => {
+db.on("error", (err) => {
   console.error("Erreur de base de données :", err);
   if (err.code === "PROTOCOL_CONNECTION_LOST") {
     console.log("Tentative de reconnexion à la base de données...");
