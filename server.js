@@ -5,6 +5,8 @@ const io = require("socket.io")(http);
 const mysql = require("mysql2");
 const session = require("express-session");
 const MySQLStore = require('express-mysql-session')(session);
+const bcrypt = require("bcryptjs");
+const bodyParser = require("body-parser");  // Ajout de cette ligne
 
 // Configuration de la base de données
 const dbConfig = {
@@ -28,13 +30,19 @@ const sessionMiddleware = session({
   saveUninitialized: false,
   store: sessionStore,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    secure: false, // Mettre à true si vous utilisez HTTPS
     maxAge: 24 * 60 * 60 * 1000 // 24 heures
   }
 });
 
-// Utiliser la session
+// Configuration du port
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(express.static('public'));
 app.use(sessionMiddleware);
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
 // Connexion à la base de données
 db.connect((err) => {
@@ -71,10 +79,6 @@ db.on("error", (err) => {
     console.log("Tentative de reconnexion à la base de données...");
   }
 });
-
-
-// Configuration du port
-const PORT = process.env.PORT || 3000;
 
 
 // Garder une trace des joueurs en ligne
