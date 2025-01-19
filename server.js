@@ -2,7 +2,7 @@ const express = require("express");
 const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
-const mysql = require("mysql");
+const mysql = require('mysql2');
 
 const connection = mysql.createConnection({
   host: "nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
