@@ -407,7 +407,7 @@ function mouseReleased(event) {
 function applyPathfinding(newdot) {
     let newdotNeighbors = newdot.neighbors();
     let mustSearch = [newdot, ...newdotNeighbors];
-
+    
     for (let dot of mustSearch) {
         if (dot.captured) continue;
         PF = new Pathfinder(dot);
@@ -418,8 +418,10 @@ function applyPathfinding(newdot) {
                 path[i].outline = outlines.length;
             }
             outlines.push(path);
+            // Ne pas mettre à jour updateScore() ici
         }
     }
+    // Appeler updateScore une seule fois après toutes les captures
     updateScore();
 }
 
@@ -555,37 +557,51 @@ function updateScore() {
         captured: dot.captured
     }));
 
+    // Préparer les outlines avec le bon format
+    const formattedOutlines = outlines.map(outline => 
+        outline.map(point => ({
+            x: point.x,
+            y: point.y,
+            type: point.type === 'red' ? 'red' : 'blue',
+            c: point.type === 'red' ? '#ed2939' : '#4267B2'
+        }))
+    );
+
     socket.emit('updateScore', {
         gameId: localStorage.getItem('gameId'),
         scoreRed,
         scoreBlue,
         dots,
-        outlines,
+        outlines: formattedOutlines,
         capturedEmpty,
         timers: {
             player1Time,
             player2Time,
-            player1ReflectionTime,
-            player2ReflectionTime,
+            commonReflectionTime,
             isReflectionPhase
         }
     });
 
+    // Mettre à jour l'affichage local
     document.getElementById("RED").innerHTML = scoreRed;
     document.getElementById("BLUE").innerHTML = scoreBlue;
 }
 
 // Gestion de l'état du jeu
+// Dans game.js - Modifier la fonction handleGameState
+
+// Modifier la fonction handleGameState dans game.js
 function handleGameState(gameState) {
     if (!gameState) return;
     
+    // Réinitialiser complètement l'état
     render = [];
     reddots = matrixArray(MAX_X, MAX_Y);
     bluedots = matrixArray(MAX_X, MAX_Y);
-    outlines = gameState.outlines || [];
+    outlines = [];  // Important: réinitialiser les outlines
     capturedEmpty = gameState.capturedEmpty || [];
-    scoreRed = gameState.scoreRed;
-    scoreBlue = gameState.scoreBlue;
+    scoreRed = gameState.scoreRed || 0;
+    scoreBlue = gameState.scoreBlue || 0;
     currentTurn = gameState.currentTurn;
 
     // Restaurer les timers
@@ -596,21 +612,37 @@ function handleGameState(gameState) {
         isReflectionPhase = gameState.timers.isReflectionPhase;
     }
 
-    // Restaurer les points
+    // Restaurer les points sans recalculer les captures
     if (gameState.dots?.length > 0) {
-        gameState.dots.forEach(dot => {
+        for (const dot of gameState.dots) {
             let newDot = new Dot(dot.type === 'player1' ? 1 : 2, dot.x, dot.y);
             if (dot.captured) newDot.captured = true;
+            
             if (dot.type === 'player1') {
                 reddots[dot.x][dot.y] = newDot;
             } else {
                 bluedots[dot.x][dot.y] = newDot;
             }
             render.push(newDot);
-        });
+        }
     }
 
+    // Restaurer les outlines depuis gameState
+    if (gameState.outlines && Array.isArray(gameState.outlines)) {
+        outlines = gameState.outlines.map(outline => 
+            outline.map(point => {
+                const dotType = point.type === 'red' ? 1 : 2;
+                const newDot = new Dot(dotType, point.x, point.y);
+                newDot.c = point.c;
+                return newDot;
+            })
+        );
+    }
+
+    // Mettre à jour l'affichage
     updateTimerDisplay();
+    document.getElementById("RED").innerHTML = scoreRed;
+    document.getElementById("BLUE").innerHTML = scoreBlue;
     draw();
 }
 
@@ -665,9 +697,26 @@ socket.on('turnChange', (newTurn) => {
 socket.on('scoreUpdated', (gameState) => {
     scoreRed = gameState.scoreRed;
     scoreBlue = gameState.scoreBlue;
-    handleGameState(gameState); // Mettre à jour l'état complet
+    
+    // Important : ne pas appeler handleGameState ici pour éviter la récursion
+    document.getElementById("RED").innerHTML = scoreRed;
+    document.getElementById("BLUE").innerHTML = scoreBlue;
+    
+    // Mettre à jour l'état du jeu sans recalculer les captures
+    if (gameState.outlines) {
+        outlines = gameState.outlines.map(outline => 
+            outline.map(point => {
+                const dotType = point.type === 'red' ? 1 : 2;
+                const newDot = new Dot(dotType, point.x, point.y);
+                newDot.c = point.c;
+                return newDot;
+            })
+        );
+    }
+    
+    // Redessiner le jeu
+    draw();
 });
-
 socket.on('connect', () => {
     console.log('Socket connected:', socket.id);
     
