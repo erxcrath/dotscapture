@@ -73,6 +73,9 @@ const games = {};
 // Ajouter ces variables au début du fichier, après la déclaration des autres variables
 const matchRequests = new Map(); // Pour stocker les demandes de match en cours
 
+// Configurer correctement les fichiers statiques
+app.use(express.static('public'));
+
 // Utiliser la session dans Express
 app.use(sessionMiddleware);
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -88,22 +91,29 @@ function requireLogin(req, res, next) {
   }
 }
 
+// Middleware d'authentification simplifié
 app.use((req, res, next) => {
-  const publicPaths = ['/login', '/register', '/public'];
-  const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
+  // Liste des chemins autorisés sans authentification
+  const publicPaths = ['/login', '/register'];
   
-  if (!isPublicPath) {
-    if (req.session && req.session.loggedin) {
-      next();
-    } else {
-      res.redirect('/login');
-    }
-  } else {
-    next();
+  // Autoriser l'accès aux fichiers statiques et aux chemins publics
+  if (req.path.startsWith('/css') || 
+      req.path.startsWith('/js') || 
+      req.path.startsWith('/public') || 
+      publicPaths.includes(req.path)) {
+    return next();
   }
+
+  // Vérifier l'authentification
+  if (req.session && req.session.loggedin) {
+    return next();
+  }
+  
+  // Rediriger vers login si non authentifié
+  res.redirect('/login');
 });
 
-// Routes
+// Routes principales
 app.get('/', (req, res) => {
   if (req.session && req.session.loggedin) {
     res.redirect('/accueil');
@@ -112,12 +122,20 @@ app.get('/', (req, res) => {
   }
 });
 
-app.get("/login", (req, res) => {
-  res.sendFile(__dirname + "/public/login.html");
+app.get('/accueil', (req, res) => {
+  if (req.session && req.session.loggedin) {
+    res.sendFile(__dirname + '/public/accueil.html');
+  } else {
+    res.redirect('/login');
+  }
 });
 
-app.get("/register", (req, res) => {
-  res.sendFile(__dirname + "/public/register.html");
+app.get('/login', (req, res) => {
+  res.sendFile(__dirname + '/public/login.html');
+});
+
+app.get('/register', (req, res) => {
+  res.sendFile(__dirname + '/public/register.html');
 });
 
 app.post("/register", (req, res) => {
@@ -169,13 +187,6 @@ app.post("/login", (req, res) => {
   }
 });
 
-app.get('/accueil', (req, res) => {
-  if (req.session && req.session.loggedin) {
-    res.sendFile(__dirname + '/public/accueil.html');
-  } else {
-    res.redirect('/login');
-  }
-});
 app.get("/game", (req, res) => {
   if (req.session && req.session.loggedin) {
     res.sendFile(__dirname + "/public/game.html");
@@ -213,10 +224,15 @@ app.get('/check-session', (req, res) => {
   }
 });
 
-// Configurer correctement les fichiers statiques
-app.use('/public', express.static('public'));
-app.use('/css', express.static('public/css'));
-app.use('/js', express.static('public/js'));
+// Route de débogage
+app.get('/debug-session', (req, res) => {
+  res.json({
+    session: req.session,
+    loggedin: req.session?.loggedin,
+    username: req.session?.username
+  });
+});
+
 
 // Attacher la session à Socket.IO
 io.use((socket, next) => {
