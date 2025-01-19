@@ -2,18 +2,19 @@ const express = require("express");
 const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
+const mysql = require("mysql2");
+const session = require("express-session");
 const MySQLStore = require('express-mysql-session')(session);
+const bcrypt = require("bcryptjs");
+const bodyParser = require("body-parser");
 
-// Modifiez la configuration de la base de données pour utiliser l'URL JAWSDB de Heroku
-const dbConfig = process.env.JAWSDB_URL ? {
-  url: process.env.JAWSDB_URL
-} : {
-  host: "nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
-  user: "q8r1hkm9a97oecvz",
-  password: "gz2nl6w62xwddq0w",
-  database: "qwkya7d3q2yxhzzu",
-  port: 3306
-};
+const db = mysql.createConnection({
+  host: process.env.JAWSDB_HOST || "nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
+  user: process.env.JAWSDB_USER || "q8r1hkm9a97oecvz",
+  password: process.env.JAWSDB_PASSWORD || "gz2nl6w62xwddq0w",
+  database: process.env.JAWSDB_DATABASE || "qwkya7d3q2yxhzzu",
+  port: process.env.JAWSDB_PORT || 3306,
+});
 
 // Créer le store de session MySQL
 const sessionStore = new MySQLStore(dbConfig);
@@ -66,9 +67,6 @@ db.on("error", (err) => {
   }
 });
 
-const bcrypt = require("bcryptjs");
-const session = require("express-session");
-const bodyParser = require("body-parser");
 
 // Configuration du port
 const PORT = process.env.PORT || 3000;
