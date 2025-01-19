@@ -56,14 +56,16 @@ const bodyParser = require("body-parser");
 const PORT = process.env.PORT || 3000;
 
 // Configurer la session Express
+// Configurer la session Express
 const sessionMiddleware = session({
   secret: "secret",
   resave: true,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 24 * 60 * 60 * 1000, // 24 heures
+    secure: process.env.NODE_ENV === "production", // Ceci peut causer des problèmes sur Heroku
+    maxAge: 24 * 60 * 60 * 1000
   },
+  proxy: true // Ajouter ceci pour Heroku
 });
 
 // Garder une trace des joueurs en ligne
@@ -79,13 +81,15 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Middleware d'authentification
 function requireLogin(req, res, next) {
-    if (req.session && req.session.loggedin) {
-        next();
-    } else {
-        // Stocker l'URL demandée pour redirection après login
-        req.session.returnTo = req.originalUrl;
-        res.redirect('/login');
-    }
+  console.log("Session:", req.session);
+  console.log("Logged in:", req.session.loggedin);
+  if (req.session && req.session.loggedin) {
+      next();
+  } else {
+      console.log("Non authentifié, redirection vers login");
+      req.session.returnTo = req.originalUrl;
+      res.redirect('/login');
+  }
 }
 
 app.use((req, res, next) => {
@@ -96,6 +100,9 @@ app.use((req, res, next) => {
   }
 });
 
+app.set('trust proxy', 1); // Nécessaire pour Heroku
+app.use(express.json());
+app.use(bodyParser.json());
 
 
 // Routes
@@ -138,17 +145,23 @@ app.post("/register", (req, res) => {
 
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
+  console.log("Tentative de connexion:", username);
+  
   if (username && password) {
     db.query(
       "SELECT * FROM users WHERE username = ?",
       [username],
       (err, results) => {
-        if (err) throw err;
+        if (err) {
+          console.error("Erreur SQL:", err);
+          throw err;
+        }
         if (results.length > 0) {
           bcrypt.compare(password, results[0].password, (err, match) => {
             if (match) {
               req.session.loggedin = true;
               req.session.username = username;
+              console.log("Connexion réussie, session:", req.session);
               res.redirect("/accueil");
             } else {
               res.status(401).send("Incorrect password!");
@@ -165,8 +178,15 @@ app.post("/login", (req, res) => {
 });
 
 app.get("/accueil", (req, res) => {
+  console.log("Accès à accueil, session:", req.session);
+  if (!req.session.loggedin) {
+    console.log("Non authentifié, redirection vers login");
+    return res.redirect('/login');
+  }
   res.sendFile(__dirname + "/public/accueil.html");
 });
+
+
 app.get('/game', (req, res) => {
     if (req.session && req.session.loggedin) {
         res.sendFile(__dirname + '/public/game.html');
