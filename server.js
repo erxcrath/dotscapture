@@ -77,14 +77,6 @@ app.use((req, res, next) => {
   }
 });
 
-// Configuration de MySQL
-const db = mysql.createConnection({
-  host: "nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
-  user: "ye6uqbklz9f468mx",
-  password: "r134fmdymstrxf6k",
-  database: "c5rshxhi3vu5jefu",
-  port: 3306,
-});
 
 db.connect((err) => {
   if (err) throw err;
