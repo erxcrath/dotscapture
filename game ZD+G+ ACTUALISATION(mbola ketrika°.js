@@ -35,7 +35,8 @@ let lastPlacedDot = null;
 
 let player1Time = 240; // 4 minutes en secondes
 let player2Time = 240;
-let commonReflectionTime = 30;
+let player1ReflectionTime = 30;
+let player2ReflectionTime = 30;
 let activeTimer = null;
 let reflectionTimer = null;
 let isReflectionPhase = true;
@@ -172,19 +173,35 @@ function startTimers() {
     if (reflectionTimer) clearInterval(reflectionTimer);
     
     isReflectionPhase = true;
-    commonReflectionTime = 30; // Réinitialiser le temps de réflexion commun
     
-    // Démarrer le timer de réflexion commun
+    // Réinitialiser le temps de réflexion pour le joueur actuel
+    if (currentTurn === 'player1') {
+        player1ReflectionTime = 30;
+    } else {
+        player2ReflectionTime = 30;
+    }
+    
     reflectionTimer = setInterval(() => {
-        if (commonReflectionTime > 0) {
-            commonReflectionTime--;
-            updateTimerDisplay();
-            emitTimerUpdate();
+        if (currentTurn === 'player1') {
+            if (player1ReflectionTime > 0) {
+                player1ReflectionTime--;
+                updateTimerDisplay();
+                emitTimerUpdate();
+            } else {
+                isReflectionPhase = false;
+                clearInterval(reflectionTimer);
+                startMainTimer();
+            }
         } else {
-            // Quand le temps de réflexion est écoulé, passer au temps principal
-            isReflectionPhase = false;
-            clearInterval(reflectionTimer);
-            startMainTimer();
+            if (player2ReflectionTime > 0) {
+                player2ReflectionTime--;
+                updateTimerDisplay();
+                emitTimerUpdate();
+            } else {
+                isReflectionPhase = false;
+                clearInterval(reflectionTimer);
+                startMainTimer();
+            }
         }
     }, 1000);
 }
@@ -219,7 +236,8 @@ function emitTimerUpdate() {
         timers: {
             player1Time,
             player2Time,
-            commonReflectionTime,
+            player1ReflectionTime,
+            player2ReflectionTime,
             isReflectionPhase
         }
     });
@@ -233,15 +251,17 @@ function updateTimerDisplay() {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // Afficher le timer de réflexion commun
-    document.getElementById('commonReflectionTimer').innerHTML = 
-        isReflectionPhase ? `Temps de réflexion: ${commonReflectionTime}s` : '';
+    // Mettre à jour les timers de réflexion
+    document.getElementById('player1ReflectionTimer').textContent = 
+        currentTurn === 'player1' ? player1ReflectionTime : '30';
+    document.getElementById('player2ReflectionTimer').textContent = 
+        currentTurn === 'player2' ? player2ReflectionTime : '30';
 
-    // Afficher les timers principaux
+    // Mettre à jour les timers principaux
     document.getElementById('player1MainTimer').textContent = formatTime(player1Time);
     document.getElementById('player2MainTimer').textContent = formatTime(player2Time);
 
-    // Mettre en évidence le joueur actif
+    // Mettre à jour l'indicateur de joueur actif
     document.querySelector('.player1-avatar').classList.toggle('active', currentTurn === 'player1');
     document.querySelector('.player2-avatar').classList.toggle('active', currentTurn === 'player2');
 }
@@ -390,9 +410,13 @@ function mouseReleased(event) {
     }
 
     if (!reddots[X][Y] && !bluedots[X][Y] && capturedEmpty.indexOf(X+' '+Y) === -1) {
-        // Arrêter les timers actuels
-        if (reflectionTimer) clearInterval(reflectionTimer);
-        if (activeTimer) clearInterval(activeTimer);
+        // Arrêter le timer de réflexion si un coup est joué
+        if (reflectionTimer) {
+            clearInterval(reflectionTimer);
+        }
+        if (activeTimer) {
+            clearInterval(activeTimer);
+        }
         
         socket.emit('placeDot', {
             gameId: localStorage.getItem('gameId'),
@@ -402,6 +426,7 @@ function mouseReleased(event) {
         });
     }
 }
+
 
 // Logique de capture
 function applyPathfinding(newdot) {
@@ -579,6 +604,7 @@ function updateScore() {
 function handleGameState(gameState) {
     if (!gameState) return;
     
+    // Restaurer l'état du jeu
     render = [];
     reddots = matrixArray(MAX_X, MAX_Y);
     bluedots = matrixArray(MAX_X, MAX_Y);
@@ -592,15 +618,18 @@ function handleGameState(gameState) {
     if (gameState.timers) {
         player1Time = gameState.timers.player1Time;
         player2Time = gameState.timers.player2Time;
-        commonReflectionTime = gameState.timers.commonReflectionTime;
+        player1ReflectionTime = gameState.timers.player1ReflectionTime;
+        player2ReflectionTime = gameState.timers.player2ReflectionTime;
         isReflectionPhase = gameState.timers.isReflectionPhase;
     }
-
-    // Restaurer les points
+    
+    // Recréer les points et capturer ceux qui doivent l'être
     if (gameState.dots?.length > 0) {
         gameState.dots.forEach(dot => {
             let newDot = new Dot(dot.type === 'player1' ? 1 : 2, dot.x, dot.y);
-            if (dot.captured) newDot.captured = true;
+            if (dot.captured) {
+                newDot.captured = true;
+            }
             if (dot.type === 'player1') {
                 reddots[dot.x][dot.y] = newDot;
             } else {
@@ -611,7 +640,7 @@ function handleGameState(gameState) {
     }
 
     updateTimerDisplay();
-    draw();
+    draw(); // Forcer le rendu
 }
 
 // Événements socket
@@ -658,7 +687,13 @@ socket.on('dotPlaced', (data) => {
 
 socket.on('turnChange', (newTurn) => {
     currentTurn = newTurn;
-    startTimers(); // Réinitialiser le temps de réflexion à chaque changement de tour
+    // Réinitialiser le temps de réflexion pour le nouveau joueur
+    if (currentTurn === 'player1') {
+        player1ReflectionTime = 30;
+    } else {
+        player2ReflectionTime = 30;
+    }
+    startTimers();
     updateTimerDisplay();
 });
 

@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>Game</title>
 
+  <!-- CSS -->
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    /* Styles existants */
     #gameCanvas {
       display: flex;
       justify-content: center;
@@ -24,6 +27,7 @@
       margin-bottom: 20px;
     }
 
+    /* Nouveau style pour le game-header */
     .game-header {
       display: flex;
       align-items: center;
@@ -36,6 +40,7 @@
       flex-wrap: wrap;
     }
 
+    /* Style des infos joueurs */
     .player-info {
       display: flex;
       align-items: center;
@@ -56,6 +61,7 @@
       justify-content: flex-end;
     }
 
+    /* Style des scores et noms */
     .player-details {
       display: flex;
       flex-direction: column;
@@ -81,34 +87,21 @@
       font-size: 1.4em;
     }
 
+    /* Style des timers */
     .timer-box {
       display: flex;
       gap: 10px;
       margin-top: 5px;
     }
 
-    .main-timer {
+    .reflection-timer, .main-timer {
       background: rgba(255, 255, 255, 0.1);
       padding: 2px 6px;
       border-radius: 3px;
       font-size: 0.9em;
     }
 
-    /* Nouveau style pour le timer de réflexion commun */
-    .common-reflection-timer {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #1a1a1a;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 1.1em;
-      margin: 10px auto;
-      width: fit-content;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-    }
-
+    /* Style des avatars */
     .player-icons {
       display: flex;
       gap: 10px;
@@ -135,6 +128,7 @@
       object-fit: cover;
     }
 
+    /* Media queries pour le responsive */
     @media (max-width: 768px) {
       .game-header {
         padding: 10px;
@@ -153,9 +147,8 @@
         font-size: 1em;
       }
 
-      .common-reflection-timer {
-        font-size: 1em;
-        padding: 8px 16px;
+      .timer-box {
+        font-size: 0.8em;
       }
     }
 
@@ -177,6 +170,8 @@
 </head>
 
 <body>
+
+
   <div class="container mt-5">
     <div class="game-info">
       <div class="row mb-3">
@@ -184,6 +179,7 @@
           <input type="text" class="form-control" id="gameId" placeholder="Enter Game ID" readonly>
         </div>
       </div>
+      <!-- Remplacer la section des scores dans game.html -->
       <div class="game-header">
         <div class="player-info player1">
           <div class="score-box">
@@ -191,6 +187,7 @@
             <span class="score" id="RED">0</span>
           </div>
           <div class="timer-box">
+            <div class="reflection-timer" id="player1ReflectionTimer">0</div>
             <div class="main-timer" id="player1MainTimer">4:00</div>
           </div>
         </div>
@@ -210,19 +207,18 @@
             <span class="score" id="BLUE">0</span>
           </div>
           <div class="timer-box">
+            <div class="reflection-timer" id="player2ReflectionTimer">0</div>
             <div class="main-timer" id="player2MainTimer">4:00</div>
           </div>
         </div>
       </div>
     </div>
-    
-    <!-- Timer de réflexion commun -->
-    <div class="common-reflection-timer" id="commonReflectionTimer">
-       <span>30</span>sec
-    </div>
-    
+    <!-- <div id="gameCanvas"></div>-->
     <div id="gameSVG"></div>
-    
+    <!-- Ajoutez ce code juste après la div des scores dans game.html -->
+
+
+    <!-- Ajoutez ce code juste après la div des scores dans game.html -->
     <div class="row mt-2 mb-3">
       <div class="col-12 text-center">
         <button id="miseATerreBtn" class="btn btn-warning" onclick="handleMiseATerre()">Mise à Terre</button>

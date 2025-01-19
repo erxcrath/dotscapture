@@ -369,15 +369,7 @@ io.on("connection", (socket) => {
                 scoreBlue: 0,
                 currentTurn: "player1",
                 player1Name: null,
-                player2Name: null,
-                outlines: [],
-                capturedEmpty: [],
-                timers: {
-                    player1Time: 240,
-                    player2Time: 240,
-                    commonReflectionTime: 30,
-                    isReflectionPhase: true
-                }
+                player2Name: null
             }
         };
 
@@ -414,12 +406,13 @@ io.on("connection", (socket) => {
                     currentTurn: "player1",
                     player1Name: null,
                     player2Name: null,
-                    outlines: [],
-                    capturedEmpty: [],
+                    outlines: [], // Ajouter les outlines
+                    capturedEmpty: [], // Ajouter les cases capturées vides
                     timers: {
                         player1Time: 240,
                         player2Time: 240,
-                        commonReflectionTime: 30,
+                        player1ReflectionTime: 30,
+                        player2ReflectionTime: 30,
                         isReflectionPhase: true
                     }
                 }
@@ -484,18 +477,13 @@ io.on("connection", (socket) => {
     // Gestion du placement des points
     socket.on("placeDot", ({ gameId, x, y, type }) => {
         if (!games[gameId] || games[gameId].gameState.currentTurn !== type) return;
-    
+
         const newDot = { x, y, type };
-        const game = games[gameId];
-        game.gameState.dots.push(newDot);
-        game.gameState.currentTurn = type === "player1" ? "player2" : "player1";
-        
-        // Réinitialiser le temps de réflexion à chaque tour
-        game.gameState.timers.commonReflectionTime = 30;
-        game.gameState.timers.isReflectionPhase = true;
+        games[gameId].gameState.dots.push(newDot);
+        games[gameId].gameState.currentTurn = type === "player1" ? "player2" : "player1";
         
         io.to(gameId).emit("dotPlaced", newDot);
-        io.to(gameId).emit("turnChange", game.gameState.currentTurn);
+        io.to(gameId).emit("turnChange", games[gameId].gameState.currentTurn);
     });
 
     // Gestion de la mise à jour des scores
@@ -536,19 +524,12 @@ io.on("connection", (socket) => {
     });
 
     // Ajouter un gestionnaire pour la mise à jour de l'état des timers
-    socket.on("updateTimers", ({ gameId, timers }) => {
-        if (games[gameId]) {
-            games[gameId].gameState.timers = {
-                player1Time: timers.player1Time,
-                player2Time: timers.player2Time,
-                commonReflectionTime: timers.commonReflectionTime,
-                isReflectionPhase: timers.isReflectionPhase
-            };
-            
-            // Émettre la mise à jour à tous les joueurs de la partie
-            io.to(gameId).emit("timerUpdate", games[gameId].gameState.timers);
-        }
-    });
+socket.on("updateTimers", ({ gameId, timers }) => {
+    if (games[gameId]) {
+        games[gameId].gameState.timers = timers;
+    }
+});
+
     // Gestion de la déconnexion
     socket.on("disconnect", () => {
         console.log("User disconnected:", socket.id);
