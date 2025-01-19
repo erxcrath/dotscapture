@@ -12,6 +12,34 @@ const connection = mysql.createConnection({
   port: 3306,
 });
 
+// Connexion à la base de données
+db.connect((err) => {
+  if (err) {
+    console.error("Erreur de connexion à la base de données :", err);
+    return;
+  }
+  console.log("Connecté avec succès à la base de données");
+  
+  // Créer la table users
+  const createTableQuery = `
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(255) NOT NULL UNIQUE,
+      password VARCHAR(255) NOT NULL,
+      score INT DEFAULT 0,
+      games_played INT DEFAULT 0
+    )
+  `;
+
+  db.query(createTableQuery, (err) => {
+    if (err) {
+      console.error("Erreur lors de la création de la table:", err);
+      return;
+    }
+    console.log("Table users vérifiée/créée");
+  });
+});
+
 // Gestion plus sécurisée de la connexion
 connection.connect((err) => {
   if (err) {
@@ -78,26 +106,6 @@ app.use((req, res, next) => {
 });
 
 
-db.connect((err) => {
-  if (err) throw err;
-  console.log("MySQL Connected...");
-
-  // Créer la table users si elle n'existe pas
-  const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS users (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(255) NOT NULL UNIQUE,
-            password VARCHAR(255) NOT NULL,
-            score INT DEFAULT 0,
-            games_played INT DEFAULT 0
-        )
-    `;
-
-  db.query(createTableQuery, (err) => {
-    if (err) throw err;
-    console.log("Users table checked/created");
-  });
-});
 
 // Routes
 app.get("/", (req, res) => {
