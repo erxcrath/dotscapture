@@ -5,21 +5,23 @@ const io = require("socket.io")(http);
 const mysql = require("mysql2");
 const session = require("express-session");
 const MySQLStore = require('express-mysql-session')(session);
-const bcrypt = require("bcryptjs");
-const bodyParser = require("body-parser");
 
-const db = mysql.createConnection({
-  host: process.env.JAWSDB_HOST || "nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
-  user: process.env.JAWSDB_USER || "q8r1hkm9a97oecvz",
-  password: process.env.JAWSDB_PASSWORD || "gz2nl6w62xwddq0w",
-  database: process.env.JAWSDB_DATABASE || "qwkya7d3q2yxhzzu",
-  port: process.env.JAWSDB_PORT || 3306,
-});
+// Configuration de la base de données
+const dbConfig = {
+  host: "nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
+  user: "q8r1hkm9a97oecvz",
+  password: "gz2nl6w62xwddq0w",
+  database: "qwkya7d3q2yxhzzu",
+  port: 3306
+};
 
-// Créer le store de session MySQL
+// Créer la connexion à la base de données
+const db = mysql.createConnection(dbConfig);
+
+// Créer le store de session
 const sessionStore = new MySQLStore(dbConfig);
 
-// Modifier la configuration de la session
+// Configuration de la session
 const sessionMiddleware = session({
   secret: "secret",
   resave: false,
@@ -30,6 +32,9 @@ const sessionMiddleware = session({
     maxAge: 24 * 60 * 60 * 1000 // 24 heures
   }
 });
+
+// Utiliser la session
+app.use(sessionMiddleware);
 
 // Connexion à la base de données
 db.connect((err) => {
