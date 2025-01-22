@@ -170,31 +170,57 @@ app.get('/register', (req, res) => {
     res.sendFile(__dirname + '/public/register.html');
 });
 
-app.post("/register", (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-        return res.status(400).send("Veuillez remplir tous les champs");
-    }
+app.post("/register", async (req, res) => {
+  const { username, password } = req.body;
+  console.log("Tentative d'enregistrement pour:", username);
 
-    bcrypt.hash(password, 8, (err, hash) => {
-        if (err) {
-            console.error("Erreur hash:", err);
-            return res.status(500).send("Erreur d'enregistrement");
-        }
-        
-        db.query(
-            "INSERT INTO users (username, password) VALUES (?, ?)",
-            [username, hash],
-            (err) => {
-                if (err) {
-                    return res.status(500).send("Erreur d'enregistrement");
-                }
-                res.redirect("/login");
-            }
-        );
-    });
+  if (!username || !password) {
+      console.log("Données manquantes");
+      return res.status(400).send("Veuillez remplir tous les champs");
+  }
+
+  try {
+      // Vérifier si l'utilisateur existe déjà
+      db.query("SELECT * FROM users WHERE username = ?", [username], async (err, results) => {
+          if (err) {
+              console.error("Erreur vérification username:", err);
+              return res.status(500).send("Erreur d'enregistrement");
+          }
+
+          if (results.length > 0) {
+              console.log("Username déjà pris:", username);
+              return res.status(400).send("Nom d'utilisateur déjà utilisé");
+          }
+
+          // Hash du mot de passe
+          try {
+              const hashedPassword = await bcrypt.hash(password, 8);
+              console.log("Mot de passe hashé avec succès");
+
+              // Insertion dans la base de données
+              db.query(
+                  "INSERT INTO users (username, password) VALUES (?, ?)",
+                  [username, hashedPassword],
+                  (err, result) => {
+                      if (err) {
+                          console.error("Erreur insertion utilisateur:", err);
+                          return res.status(500).send("Erreur lors de l'enregistrement dans la base de données");
+                      }
+
+                      console.log("Utilisateur enregistré avec succès:", username);
+                      res.redirect("/login");
+                  }
+              );
+          } catch (hashError) {
+              console.error("Erreur hashage mot de passe:", hashError);
+              return res.status(500).send("Erreur lors du hashage du mot de passe");
+          }
+      });
+  } catch (error) {
+      console.error("Erreur générale:", error);
+      res.status(500).send("Erreur serveur lors de l'enregistrement");
+  }
 });
-
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
   console.log("Tentative de connexion pour:", username);
