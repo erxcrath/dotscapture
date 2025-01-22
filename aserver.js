@@ -16,10 +16,10 @@ const spectators = new Map();
 
 // Configuration MySQL
 const dbConfig = {
-  host: "nwhazdrp7hdpd4a4.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
-  user: "q8r1hkm9a97oecvz",
-  password: "gz2nl6w62xwddq0w",
-  database: "qwkya7d3q2yxhzzu",
+  host: "kil9uzd3tgem3naa.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
+  user: "vq59kak6l2fnh7wb",
+  password: "fro27g39ovtnax2m",
+  database: "hv3q4ftkopxrnj0n",
   port: 3306
 };
 
