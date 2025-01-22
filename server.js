@@ -69,15 +69,21 @@ const sessionStore = new MySQLStore({
 });
 
 const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || 'your_secret_key',
-    resave: true,
-    saveUninitialized: true,
-    store: sessionStore,
-    cookie: {
-        secure: true, // true car HTTPS sur Heroku
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 // 24 heures
-    }
+  key: 'session_cookie',
+  secret: 'your_secret_key',
+  resave: true,
+  saveUninitialized: true,
+  store: sessionStore,
+  cookie: {
+      secure: false,  // Important: false pour le moment
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000
+  }
+});
+
+// Appliquer le middleware session à Socket.IO
+io.use((socket, next) => {
+  sessionMiddleware(socket.request, socket.request.res || {}, next);
 });
 
 // Configuration du serveur Express
@@ -317,39 +323,38 @@ io.use((socket, next) => {
 });
 
 // Gestion des connexions Socket.IO
+
+
+javascriptCopy// Dans server.js
 io.on("connection", (socket) => {
-  console.log("Nouvelle connexion socket:", socket.id);
+    console.log("Nouvelle connexion socket:", socket.id);
 
-  // Gestion de l'authentification socket
-  if (socket.request.session && socket.request.session.username) {
-      const username = socket.request.session.username;
-      console.log("Utilisateur authentifié:", username);
+    // Ajouter socket.request.session.username à la Map onlinePlayers
+    if (socket.request.session?.username) {
+        const username = socket.request.session.username;
+        console.log("Utilisateur authentifié connecté:", username);
 
-      // Nettoyer les anciennes connexions du même utilisateur
-      for (const [oldSocketId, player] of onlinePlayers.entries()) {
-          if (player.username === username) {
-              onlinePlayers.delete(oldSocketId);
-          }
-      }
+        // Ajouter le joueur à la liste
+        onlinePlayers.set(socket.id, {
+            username: username,
+            inGame: false,
+            id: socket.id
+        });
 
-      // Ajouter le joueur à la liste des joueurs en ligne
-      onlinePlayers.set(socket.id, {
-          username: username,
-          inGame: false,
-          id: socket.id
-      });
+        // Debug: afficher la liste des joueurs
+        console.log("Liste des joueurs après ajout:", 
+            Array.from(onlinePlayers.values()).map(p => p.username)
+        );
 
-      // Annoncer la mise à jour à tous les clients
-      io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
-      console.log("Joueurs en ligne après connexion:", Array.from(onlinePlayers.values()));
-  }
+        // Émettre la mise à jour
+        io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
+    }
 
-  // Répondre immédiatement à la demande de liste des joueurs
-  socket.on("requestOnlinePlayers", () => {
-      const players = Array.from(onlinePlayers.values());
-      console.log("Envoi de la liste des joueurs:", players);
-      socket.emit("updateOnlinePlayers", players);
-  });
+    socket.on("requestOnlinePlayers", () => {
+        const players = Array.from(onlinePlayers.values());
+        console.log("Envoi de la liste des joueurs:", players);
+        io.emit("updateOnlinePlayers", players);  // Changé de socket.emit à io.emit
+    });
 
 
     socket.on("requestLeaderboard", () => {
@@ -743,11 +748,16 @@ io.on("connection", (socket) => {
           const player = onlinePlayers.get(socket.id);
           console.log("Déconnexion de:", player.username);
           onlinePlayers.delete(socket.id);
+          
+          // Debug: afficher la liste après suppression
+          console.log("Liste des joueurs après déconnexion:",
+              Array.from(onlinePlayers.values()).map(p => p.username)
+          );
+          
           io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
       }
   });
 });
-
 // Démarrage du serveur
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {

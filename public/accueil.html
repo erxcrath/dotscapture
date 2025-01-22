@@ -433,7 +433,32 @@
             matchRequest.style.display = 'none';
         }
 
+   
         
+        socket.on("connect", () => {
+    console.log("Socket connecté, ID:", socket.id);
+    socket.emit("requestOnlinePlayers");
+});
+
+socket.on("updateOnlinePlayers", (players) => {
+    console.log("Mise à jour des joueurs reçue:", players);
+    const container = document.getElementById('online-players');
+    
+    if (!players || players.length === 0) {
+        container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
+        return;
+    }
+
+    const currentUser = socket.username;  // Ajouté
+    container.innerHTML = players
+        .filter(player => player.username !== currentUser)  // Ne pas afficher le joueur actuel
+        .map(player => `
+            <div class="player-card">
+                ${player.username} 
+                ${player.inGame ? '(En partie)' : '(Disponible)'}
+            </div>
+        `).join('');
+});        
 
 socket.on("updateOnlinePlayers", (players) => {
     console.log("Mise à jour des joueurs:", players);
