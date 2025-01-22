@@ -169,53 +169,57 @@
         }
 
         .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            padding: 15px;
-        }
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+}
 
-        .modal-content {
-            position: relative;
-            background-color: white;
-            margin: 10% auto;
-            padding: 20px;
-            width: 90%;
-            max-width: 500px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 500px;
+    border-radius: 8px;
+    position: relative;
+}
 
-        .close-modal {
-            position: absolute;
-            right: 15px;
-            top: 10px;
-            font-size: 24px;
-            cursor: pointer;
-            color: #666;
-            padding: 5px;
-        }
+.close-modal {
+    position: absolute;
+    right: 10px;
+    top: 5px;
+    font-size: 24px;
+    cursor: pointer;
+}
 
-        .notification {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            max-width: 400px;
-            padding: 15px;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            display: none;
-            z-index: 1100;
-            text-align: center;
-        }
+.request-game {
+    width: 100%;
+    padding: 10px;
+    margin-top: 15px;
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.notification {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
 
         .notification-buttons {
             display: flex;
@@ -348,20 +352,23 @@
         </div>
     </div>
 
-    <div id="playerModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeModal()">&times;</span>
-            <h2 id="modalPlayerName"></h2>
-            <div class="player-stats">
-                <div>Score total : <span id="modalPlayerScore">0</span></div>
-                <div>Parties jouées : <span id="modalPlayerGames">0</span></div>
-                <div>Ratio victoires : <span id="modalPlayerRatio">0%</span></div>
-            </div>
-            <button id="requestGameBtn" class="request-game" onclick="requestGame()">
-                Demander un match
-            </button>
-        </div>
+    <!-- Ajouter dans le body -->
+<div id="playerModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="document.getElementById('playerModal').style.display='none'">&times;</span>
+        <h2 id="modalPlayerName"></h2>
+        <button id="requestGameBtn" class="request-game">Demander un match</button>
     </div>
+</div>
+
+<!-- Gardez seulement une instance de cette div -->
+<div id="matchRequest" class="notification">
+    <div id="requestText"></div>
+    <div class="notification-buttons">
+        <button onclick="acceptMatch()" class="accept-btn">Accepter</button>
+        <button onclick="declineMatch()" class="decline-btn">Refuser</button>
+    </div>
+</div>
 
     <div id="matchRequest" class="notification">
         <span id="requestText"></span>
@@ -390,18 +397,12 @@
         }
 
         function showPlayerModal(player) {
-            selectedPlayer = player;
-            document.getElementById('modalPlayerName').textContent = player.username;
-            document.getElementById('modalPlayerScore').textContent = player.score || 0;
-            document.getElementById('modalPlayerGames').textContent = player.games_played || 0;
-            document.getElementById('modalPlayerRatio').textContent = 
-                `${player.games_played ? Math.round((player.score / player.games_played) * 100) : 0}%`;
-            
-            const requestBtn = document.getElementById('requestGameBtn');
-            requestBtn.disabled = player.inGame;
-            
-            modal.style.display = 'block';
-        }
+    selectedPlayer = player;
+    document.getElementById('modalPlayerName').textContent = player.username;
+    const requestBtn = document.getElementById('requestGameBtn');
+    requestBtn.disabled = player.inGame;
+    modal.style.display = 'block';
+}
 
         function closeModal() {
             modal.style.display = 'none';
@@ -416,6 +417,31 @@
                 closeModal();
             }
         }
+
+        function handlePlayerClick(playerUsername, isInGame) {
+    console.log("Clic sur joueur:", playerUsername, "En jeu:", isInGame);
+    
+    if (isInGame) {
+        alert("Ce joueur est déjà en partie");
+        return;
+    }
+
+    // Afficher la modal
+    const modal = document.getElementById('playerModal');
+    const modalPlayerName = document.getElementById('modalPlayerName');
+    const requestGameBtn = document.getElementById('requestGameBtn');
+
+    modalPlayerName.textContent = playerUsername;
+    
+    // Configurer le bouton de demande de match
+    requestGameBtn.onclick = () => {
+        console.log("Envoi demande de match à:", playerUsername);
+        socket.emit('requestMatch', { toPlayer: playerUsername });
+        modal.style.display = 'none';
+    };
+
+    modal.style.display = 'block';
+}
 
         function showMatchRequest(fromPlayer) {
             const requestText = document.getElementById('requestText');
@@ -441,26 +467,6 @@
 });
 
 socket.on("updateOnlinePlayers", (players) => {
-    console.log("Mise à jour des joueurs reçue:", players);
-    const container = document.getElementById('online-players');
-    
-    if (!players || players.length === 0) {
-        container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
-        return;
-    }
-
-    const currentUser = socket.username;  // Ajouté
-    container.innerHTML = players
-        .filter(player => player.username !== currentUser)  // Ne pas afficher le joueur actuel
-        .map(player => `
-            <div class="player-card">
-                ${player.username} 
-                ${player.inGame ? '(En partie)' : '(Disponible)'}
-            </div>
-        `).join('');
-});        
-
-socket.on("updateOnlinePlayers", (players) => {
     console.log("Mise à jour des joueurs:", players);
     const container = document.getElementById('online-players');
     
@@ -469,12 +475,17 @@ socket.on("updateOnlinePlayers", (players) => {
         return;
     }
 
-    container.innerHTML = players.map(player => `
-        <div class="player-card">
-            ${player.username} 
-            ${player.inGame ? '(En partie)' : '(Disponible)'}
-        </div>
-    `).join('');
+    container.innerHTML = players
+        .map(player => `
+            <div class="player-card" onclick="handlePlayerClick('${player.username}', ${player.inGame})">
+                <div class="player-info">
+                    ${player.username} 
+                    ${player.inGame ? 
+                        '<span class="status-in-game">(En partie)</span>' : 
+                        '<span class="status-available">(Disponible)</span>'}
+                </div>
+            </div>
+        `).join('');
 
     // Mettre à jour le compteur
     document.querySelector('.card-title').textContent = 
