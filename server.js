@@ -325,7 +325,7 @@ io.use((socket, next) => {
 // Gestion des connexions Socket.IO
 
 
-javascriptCopy// Dans server.js
+
 io.on("connection", (socket) => {
   console.log("Nouvelle connexion socket:", socket.id);
   
