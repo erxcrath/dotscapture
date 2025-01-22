@@ -16,10 +16,11 @@ const spectators = new Map();
 
 // Configuration MySQL
 const dbConfig = {
-  host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASS || "",
-  database: process.env.DB_NAME || "circle_game"
+  host: "kil9uzd3tgem3naa.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
+  user: "vq59kak6l2fnh7wb",
+  password: "fro27g39ovtnax2m",
+  database: "hv3q4ftkopxrnj0n",
+  port: 3306
 };
 
 // Initialisation de la connexion MySQL
