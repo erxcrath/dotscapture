@@ -86,24 +86,39 @@ db.connect(err => {
 // Configuration du store de session
 const sessionStore = new MySQLStore(dbConfig);
 
-// Configuration de la session
+// Modifiez la configuration de la session
 const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || "your_secret_key",
-    resave: false,
-    saveUninitialized: false,
-    store: sessionStore,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60 * 1000 // 24 heures
-    }
+  secret: 'your_secret_key',
+  resave: true,                 // Changé à true
+  saveUninitialized: true,      // Changé à true
+  store: new MySQLStore({
+      host: "kil9uzd3tgem3naa.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
+      user: "vq59kak6l2fnh7wb",
+      password: "fro27g39ovtnax2m",
+      database: "hv3q4ftkopxrnj0n",
+      port: 3306,
+      clearExpired: true,
+      checkExpirationInterval: 900000,
+      expiration: 86400000,
+      createDatabaseTable: true
+  }),
+  cookie: {
+      secure: true,             // true car vous utilisez HTTPS sur Heroku
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 24 heures
+  }
 });
+
+// Assurez-vous d'utiliser le middleware avant les routes
+app.use(sessionMiddleware);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Port du serveur
 const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.static('public'));
-app.use(sessionMiddleware);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
