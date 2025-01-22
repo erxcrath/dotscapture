@@ -164,48 +164,70 @@ app.post("/register", (req, res) => {
 });
 
 app.post("/login", (req, res) => {
-    const { username, password } = req.body;
-    if (username && password) {
-        db.query(
-            "SELECT * FROM users WHERE username = ?",
-            [username],
-            (err, results) => {
-                if (err) {
-                    console.error("Erreur SQL:", err);
-                    return res.status(500).send("Erreur serveur");
-                }
-                if (results.length > 0) {
-                    bcrypt.compare(password, results[0].password, (err, match) => {
-                        if (err) {
-                            console.error("Erreur bcrypt:", err);
-                            return res.status(500).send("Erreur serveur");
-                        }
-                        if (match) {
-                            req.session.loggedin = true;
-                            req.session.username = username;
-                            req.session.save(err => {
-                                if (err) {
-                                    console.error("Erreur session:", err);
-                                    return res.status(500).send("Erreur session");
-                                }
-                                res.redirect("/accueil");
-                            });
-                        } else {
-                            res.status(401).send("Mot de passe incorrect");
-                        }
-                    });
-                } else {
-                    res.status(404).send("Utilisateur non trouvé");
-                }
-            }
-        );
-    } else {
-        res.status(400).send("Veuillez remplir tous les champs");
-    }
+  const { username, password } = req.body;
+  console.log("1. Tentative de connexion pour:", username);
+
+  if (username && password) {
+      db.query(
+          "SELECT * FROM users WHERE username = ?",
+          [username],
+          (err, results) => {
+              if (err) {
+                  console.error("2. Erreur SQL:", err);
+                  return res.status(500).send("Erreur serveur");
+              }
+              console.log("3. Résultats de la requête:", results);
+
+              if (results.length > 0) {
+                  console.log("4. Mot de passe hasché en DB:", results[0].password);
+                  bcrypt.compare(password, results[0].password, (err, match) => {
+                      console.log("5. Résultat du compare:", match);
+                      if (err) {
+                          console.error("6. Erreur bcrypt:", err);
+                          return res.status(500).send("Erreur serveur");
+                      }
+                      if (match) {
+                          req.session.loggedin = true;
+                          req.session.username = username;
+                          console.log("7. Session avant save:", req.session);
+                          
+                          req.session.save((err) => {
+                              if (err) {
+                                  console.error("8. Erreur save session:", err);
+                                  return res.status(500).send("Erreur session");
+                              }
+                              console.log("9. Session sauvegardée, redirection vers accueil");
+                              return res.redirect("/accueil");
+                          });
+                      } else {
+                          console.log("10. Mot de passe incorrect");
+                          res.status(401).send("Mot de passe incorrect");
+                      }
+                  });
+              } else {
+                  console.log("11. Utilisateur non trouvé");
+                  res.status(404).send("Utilisateur non trouvé");
+              }
+          }
+      );
+  } else {
+      console.log("12. Champs manquants");
+      res.status(400).send("Veuillez remplir tous les champs");
+  }
 });
 
-app.get('/accueil', requireLogin, (req, res) => {
-    res.sendFile(__dirname + '/public/accueil.html');
+app.get('/accueil', (req, res) => {
+  console.log("A. Accès à /accueil");
+  console.log("B. Session complète:", req.session);
+  console.log("C. loggedin:", req.session.loggedin);
+  
+  if (req.session && req.session.loggedin) {
+      console.log("D. Envoi de accueil.html");
+      res.sendFile(path.join(__dirname, 'public', 'accueil.html'));
+  } else {
+      console.log("E. Redirection vers login");
+      res.redirect('/login');
+  }
 });
 
 app.get('/game', requireLogin, (req, res) => {
