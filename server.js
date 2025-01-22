@@ -327,34 +327,40 @@ io.use((socket, next) => {
 
 javascriptCopy// Dans server.js
 io.on("connection", (socket) => {
-    console.log("Nouvelle connexion socket:", socket.id);
+  console.log("Nouvelle connexion socket:", socket.id);
+  
+  // Vérifier authentification
+  if (socket.request.session && socket.request.session.username) {
+      const username = socket.request.session.username;
+      console.log("Utilisateur connecté:", username);
 
-    // Ajouter socket.request.session.username à la Map onlinePlayers
-    if (socket.request.session?.username) {
-        const username = socket.request.session.username;
-        console.log("Utilisateur authentifié connecté:", username);
+      // Supprimer les anciennes connexions
+      for (const [oldSocketId, player] of onlinePlayers.entries()) {
+          if (player.username === username) {
+              onlinePlayers.delete(oldSocketId);
+          }
+      }
 
-        // Ajouter le joueur à la liste
-        onlinePlayers.set(socket.id, {
-            username: username,
-            inGame: false,
-            id: socket.id
-        });
+      // Ajouter le joueur connecté
+      onlinePlayers.set(socket.id, {
+          username: username,
+          inGame: false,
+          id: socket.id,
+          score: 0,
+          games_played: 0
+      });
 
-        // Debug: afficher la liste des joueurs
-        console.log("Liste des joueurs après ajout:", 
-            Array.from(onlinePlayers.values()).map(p => p.username)
-        );
+      // Mise à jour des joueurs en ligne
+      io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
+      console.log("Joueurs en ligne:", Array.from(onlinePlayers.values()));
+  }
 
-        // Émettre la mise à jour
-        io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
-    }
+  socket.on("requestOnlinePlayers", () => {
+      const players = Array.from(onlinePlayers.values());
+      console.log("Liste des joueurs:", players);
+      io.emit("updateOnlinePlayers", players);
+  });
 
-    socket.on("requestOnlinePlayers", () => {
-        const players = Array.from(onlinePlayers.values());
-        console.log("Envoi de la liste des joueurs:", players);
-        io.emit("updateOnlinePlayers", players);  // Changé de socket.emit à io.emit
-    });
 
 
     socket.on("requestLeaderboard", () => {
@@ -744,16 +750,10 @@ io.on("connection", (socket) => {
   });
     // Gérer la déconnexion immédiatement
     socket.on("disconnect", () => {
-      if (onlinePlayers.has(socket.id)) {
-          const player = onlinePlayers.get(socket.id);
-          console.log("Déconnexion de:", player.username);
+      const playerInfo = onlinePlayers.get(socket.id);
+      if (playerInfo) {
+          console.log("Déconnexion:", playerInfo.username);
           onlinePlayers.delete(socket.id);
-          
-          // Debug: afficher la liste après suppression
-          console.log("Liste des joueurs après déconnexion:",
-              Array.from(onlinePlayers.values()).map(p => p.username)
-          );
-          
           io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
       }
   });
