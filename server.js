@@ -9,6 +9,38 @@ const MySQLStore = require('express-mysql-session')(session);
 const bodyParser = require("body-parser");
 const path = require("path");
 
+const sessionConfig = {
+  key: 'session_cookie',
+  secret: 'your_secret_key',
+  resave: true,
+  saveUninitialized: true,
+  cookie: {
+      secure: false, // Changé à false pour le moment
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000
+  },
+  store: new MySQLStore({
+      host: "kil9uzd3tgem3naa.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
+      user: "vq59kak6l2fnh7wb",
+      password: "fro27g39ovtnax2m",
+      database: "hv3q4ftkopxrnj0n",
+      port: 3306,
+      clearExpired: true,
+      checkExpirationInterval: 900000,
+      expiration: 86400000,
+      createDatabaseTable: true,
+      schema: {
+          tableName: 'sessions',
+          columnNames: {
+              session_id: 'session_id',
+              expires: 'expires',
+              data: 'data'
+          }
+      }
+  })
+};
+
+app.use(session(sessionConfig));
 // Configuration MySQL
 const dbConfig = {
     host: "kil9uzd3tgem3naa.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
@@ -163,61 +195,71 @@ app.post("/register", (req, res) => {
     });
 });
 
-app.post("/login", async (req, res) => {
-    const { username, password } = req.body;
-    console.log("Tentative de connexion pour:", username);
+app.post("/login", (req, res) => {
+  const { username, password } = req.body;
+  console.log("Tentative de connexion pour:", username);
 
-    if (!username || !password) {
-        return res.status(400).send("Veuillez remplir tous les champs");
-    }
+  if (username && password) {
+      db.query(
+          "SELECT * FROM users WHERE username = ?",
+          [username],
+          async (err, results) => {
+              if (err) {
+                  console.error("Erreur SQL:", err);
+                  return res.status(500).send("Erreur serveur");
+              }
 
-    db.query(
-        "SELECT * FROM users WHERE username = ?",
-        [username],
-        async (err, results) => {
-            if (err) {
-                console.error("Erreur SQL:", err);
-                return res.status(500).send("Erreur serveur");
-            }
-
-            if (results.length === 0) {
-                return res.status(404).send("Utilisateur non trouvé");
-            }
-
-            try {
-                const match = await bcrypt.compare(password, results[0].password);
-                if (!match) {
-                    return res.status(401).send("Mot de passe incorrect");
-                }
-
-                // Création de la session
-                req.session.loggedin = true;
-                req.session.username = username;
-                req.session.userId = results[0].id;
-
-                req.session.save((err) => {
-                    if (err) {
-                        console.error("Erreur sauvegarde session:", err);
-                        return res.status(500).send("Erreur session");
-                    }
-                    res.redirect("/accueil");
-                });
-            } catch (error) {
-                console.error("Erreur bcrypt:", error);
-                res.status(500).send("Erreur serveur");
-            }
-        }
-    );
+              if (results.length > 0) {
+                  const match = await bcrypt.compare(password, results[0].password);
+                  if (match) {
+                      // Définir les variables de session
+                      req.session.regenerate((err) => {
+                          if (err) {
+                              console.error("Erreur régénération session:", err);
+                              return res.status(500).send("Erreur session");
+                          }
+                          
+                          req.session.loggedin = true;
+                          req.session.username = username;
+                          req.session.userId = results[0].id;
+                          
+                          req.session.save((err) => {
+                              if (err) {
+                                  console.error("Erreur sauvegarde session:", err);
+                                  return res.status(500).send("Erreur session");
+                              }
+                              console.log("Session sauvegardée:", req.session);
+                              return res.redirect("/accueil");
+                          });
+                      });
+                  } else {
+                      res.status(401).send("Mot de passe incorrect");
+                  }
+              } else {
+                  res.status(404).send("Utilisateur non trouvé");
+              }
+          }
+      );
+  } else {
+      res.status(400).send("Veuillez remplir tous les champs");
+  }
 });
 
 app.get('/accueil', (req, res) => {
-    console.log("Session à l'accueil:", req.session);
-    
-    if (req.session && req.session.loggedin) {
-        res.sendFile(path.join(__dirname, 'public', 'accueil.html'));
-    } else {
-        res.redirect('/login');
-    }
+  console.log("Session complète à l'accueil:", req.session);
+  
+  if (!req.session) {
+      console.log("Pas de session");
+      return res.redirect('/login');
+  }
+
+  if (!req.session.loggedin) {
+      console.log("Non connecté");
+      return res.redirect('/login');
+  }
+
+  console.log("Utilisateur connecté:", req.session.username);
+  res.sendFile(path.join(__dirname, 'public', 'accueil.html'));
 });
 
 app.get('/game', requireLogin, (req, res) => {
