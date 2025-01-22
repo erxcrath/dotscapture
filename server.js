@@ -318,40 +318,56 @@ io.use((socket, next) => {
 
 // Gestion des connexions Socket.IO
 io.on("connection", (socket) => {
-    console.log("Nouvelle connexion:", socket.id);
-    const userDisconnectTimeouts = new Map();
+  console.log("Nouvelle connexion socket:", socket.id);
 
-    // Gestion de l'authentification socket
-    if (socket.request.session?.username) {
-        const username = socket.request.session.username;
+  // Mise à jour immédiate des joueurs en ligne lors de la connexion
+  socket.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
 
-        // Gestion des timeouts de déconnexion
-        if (userDisconnectTimeouts.has(username)) {
-            clearTimeout(userDisconnectTimeouts.get(username));
-            userDisconnectTimeouts.delete(username);
-        }
+  // Vérifier si l'utilisateur est authentifié
+  if (socket.request.session && socket.request.session.username) {
+      const username = socket.request.session.username;
+      console.log("Utilisateur authentifié connecté:", username);
 
-        // Mise à jour des connexions
-        for (const [oldSocketId, player] of onlinePlayers.entries()) {
-            if (player.username === username) {
-                onlinePlayers.delete(oldSocketId);
-                break;
-            }
-        }
+      // Supprimer toute ancienne connexion de cet utilisateur
+      for (const [oldSocketId, player] of onlinePlayers.entries()) {
+          if (player.username === username) {
+              onlinePlayers.delete(oldSocketId);
+          }
+      }
 
-        onlinePlayers.set(socket.id, {
-            username,
-            inGame: false,
-            id: socket.id
-        });
-        
-        io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
-    }
+      // Ajouter le nouveau joueur
+      onlinePlayers.set(socket.id, {
+          username: username,
+          inGame: false,
+          id: socket.id,
+          score: 0,
+          games_played: 0
+      });
 
-    // Gestion des événements de jeu
-    socket.on("requestOnlinePlayers", () => {
-        socket.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
-    });
+      // Obtenir les statistiques du joueur depuis la base de données
+      db.query(
+          "SELECT score, games_played FROM users WHERE username = ?",
+          [username],
+          (err, results) => {
+              if (!err && results.length > 0) {
+                  const player = onlinePlayers.get(socket.id);
+                  if (player) {
+                      player.score = results[0].score;
+                      player.games_played = results[0].games_played;
+                      onlinePlayers.set(socket.id, player);
+                  }
+              }
+              // Émettre la mise à jour après avoir obtenu les statistiques
+              io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
+          }
+      );
+  }
+
+  // Événement pour demander la liste des joueurs
+  socket.on("requestOnlinePlayers", () => {
+      console.log("Demande de liste des joueurs en ligne reçue");
+      socket.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
+  });
 
     socket.on("requestLeaderboard", () => {
         db.query(

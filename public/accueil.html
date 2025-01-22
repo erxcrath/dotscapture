@@ -106,12 +106,44 @@
         }
 
         .player-card {
-            padding: 12px;
-            border-bottom: 1px solid #e8eaed;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    margin-bottom: 8px;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
 
+.player-card:hover {
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transform: translateY(-1px);
+}
+
+.player-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-in-game {
+    color: #ea4335;
+    font-size: 0.9em;
+}
+
+.status-available {
+    color: #34a853;
+    font-size: 0.9em;
+}
+
+.loading-text {
+    text-align: center;
+    color: #666;
+    padding: 20px;
+}
         .player-card:active {
             background-color: #f1f3f4;
         }
@@ -402,31 +434,53 @@
         }
 
         socket.on('connect', () => {
-            console.log('Connecté au serveur');
-            socket.emit('requestOnlinePlayers');
-            socket.emit('requestLeaderboard');
-        });
+    console.log('Connecté au serveur Socket.IO');
+    socket.emit('requestOnlinePlayers');
+    socket.emit('requestLeaderboard');
+});
 
-        socket.on('updateOnlinePlayers', (players) => {
-            const container = document.getElementById('online-players');
-            document.querySelector('.card-title').textContent = `Joueurs en ligne (${players.length})`;
+// Rafraîchir la liste toutes les 5 secondes
+setInterval(() => {
+    socket.emit('requestOnlinePlayers');
+    socket.emit('requestLeaderboard');
+}, 5000);
+
+        socket.on("updateOnlinePlayers", (players) => {
+    console.log("Mise à jour des joueurs en ligne reçue:", players);
+    const container = document.getElementById('online-players');
+    const title = document.querySelector('.card-title');
+    
+    // Mettre à jour le titre avec le nombre de joueurs
+    title.textContent = `Joueurs en ligne (${players.length})`;
+    
+    // Si aucun joueur
+    if (!players || players.length === 0) {
+        container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
+        return;
+    }
+    
+    // Générer la liste des joueurs
+    container.innerHTML = players
+        .map(player => {
+            // Ne pas afficher le joueur actuel dans la liste
+            if (player.username === socket.username) return '';
             
-            if (!players.length) {
-                container.innerHTML = '<div class="loading-text">Aucun joueur en ligne</div>';
-                return;
-            }
-
-            container.innerHTML = '';
-            players.forEach(player => {
-                const div = document.createElement('div');
-                div.className = 'player-card';
-                div.innerHTML = `
-                    ${player.username} ${player.inGame ? ' (En partie)' : ''}
-                `;
-                div.onclick = () => showPlayerModal(player);
-                container.appendChild(div);
-            });
-        });
+            return `
+                <div class="player-card" onclick="showPlayerModal({
+                    username: '${player.username}',
+                    score: ${player.score || 0},
+                    games_played: ${player.games_played || 0},
+                    inGame: ${player.inGame}
+                })">
+                    <div class="player-info">
+                        ${player.username} 
+                        ${player.inGame ? '<span class="status-in-game">(En partie)</span>' : 
+                                        '<span class="status-available">(Disponible)</span>'}
+                    </div>
+                </div>`;
+        })
+        .join('');
+});
 
         socket.on('updateLeaderboard', (leaderboard) => {
             const tbody = document.getElementById('leaderboard');
