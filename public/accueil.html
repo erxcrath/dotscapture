@@ -433,54 +433,33 @@
             matchRequest.style.display = 'none';
         }
 
-        socket.on('connect', () => {
-    console.log('Connecté au serveur Socket.IO');
-    socket.emit('requestOnlinePlayers');
-    socket.emit('requestLeaderboard');
-});
+        
 
-// Rafraîchir la liste toutes les 5 secondes
-setInterval(() => {
-    socket.emit('requestOnlinePlayers');
-    socket.emit('requestLeaderboard');
-}, 5000);
-
-        socket.on("updateOnlinePlayers", (players) => {
-    console.log("Mise à jour des joueurs en ligne reçue:", players);
+socket.on("updateOnlinePlayers", (players) => {
+    console.log("Mise à jour des joueurs:", players);
     const container = document.getElementById('online-players');
-    const title = document.querySelector('.card-title');
     
-    // Mettre à jour le titre avec le nombre de joueurs
-    title.textContent = `Joueurs en ligne (${players.length})`;
-    
-    // Si aucun joueur
     if (!players || players.length === 0) {
         container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
         return;
     }
-    
-    // Générer la liste des joueurs
-    container.innerHTML = players
-        .map(player => {
-            // Ne pas afficher le joueur actuel dans la liste
-            if (player.username === socket.username) return '';
-            
-            return `
-                <div class="player-card" onclick="showPlayerModal({
-                    username: '${player.username}',
-                    score: ${player.score || 0},
-                    games_played: ${player.games_played || 0},
-                    inGame: ${player.inGame}
-                })">
-                    <div class="player-info">
-                        ${player.username} 
-                        ${player.inGame ? '<span class="status-in-game">(En partie)</span>' : 
-                                        '<span class="status-available">(Disponible)</span>'}
-                    </div>
-                </div>`;
-        })
-        .join('');
+
+    container.innerHTML = players.map(player => `
+        <div class="player-card">
+            ${player.username} 
+            ${player.inGame ? '(En partie)' : '(Disponible)'}
+        </div>
+    `).join('');
+
+    // Mettre à jour le compteur
+    document.querySelector('.card-title').textContent = 
+        `Joueurs en ligne (${players.length})`;
 });
+
+// Rafraîchir toutes les 5 secondes
+setInterval(() => {
+    socket.emit("requestOnlinePlayers");
+}, 5000);
 
         socket.on('updateLeaderboard', (leaderboard) => {
             const tbody = document.getElementById('leaderboard');
