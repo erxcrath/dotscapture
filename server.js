@@ -7,31 +7,54 @@ const bcrypt = require("bcryptjs");
 const session = require("express-session");
 const MySQLStore = require('express-mysql-session')(session);
 const bodyParser = require("body-parser");
-const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
-
-// Map pour stocker les spectateurs
-const spectators = new Map();
 
 // Configuration MySQL
 const dbConfig = {
-  host: "kil9uzd3tgem3naa.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
-  user: "vq59kak6l2fnh7wb",
-  password: "fro27g39ovtnax2m",
-  database: "hv3q4ftkopxrnj0n",
-  port: 3306
+    host: "kil9uzd3tgem3naa.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
+    user: "vq59kak6l2fnh7wb",
+    password: "fro27g39ovtnax2m",
+    database: "hv3q4ftkopxrnj0n",
+    port: 3306
 };
 
-// Initialisation de la connexion MySQL
-let db;
-if (process.env.JAWSDB_URL) {
-    db = mysql.createConnection(process.env.JAWSDB_URL);
-} else {
-    db = mysql.createConnection(dbConfig);
-}
+// Maps pour le jeu
+const onlinePlayers = new Map();
+const games = {};
+const matchRequests = new Map();
+const spectators = new Map();
 
-// Fonction de gestion de la reconnexion
+// Initialisation de la connexion MySQL
+let db = mysql.createConnection(process.env.JAWSDB_URL || dbConfig);
+
+// Configuration de la session
+const sessionStore = new MySQLStore({
+    ...dbConfig,
+    clearExpired: true,
+    checkExpirationInterval: 900000,
+    expiration: 86400000,
+    createDatabaseTable: true,
+});
+
+const sessionMiddleware = session({
+    secret: process.env.SESSION_SECRET || 'your_secret_key',
+    resave: true,
+    saveUninitialized: true,
+    store: sessionStore,
+    cookie: {
+        secure: true, // true car HTTPS sur Heroku
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 heures
+    }
+});
+
+// Configuration du serveur Express
+app.use(express.static('public'));
+app.use(sessionMiddleware);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Gestion de la connexion MySQL
 function handleDisconnect() {
     db = mysql.createConnection(process.env.JAWSDB_URL || dbConfig);
     
@@ -41,7 +64,9 @@ function handleDisconnect() {
             setTimeout(handleDisconnect, 2000);
             return;
         }
-        console.log('Reconnecté avec succès à MySQL');
+        console.log('Connecté à MySQL');
+
+        initializeDatabase();
     });
 
     db.on('error', err => {
@@ -54,16 +79,8 @@ function handleDisconnect() {
     });
 }
 
-// Première connexion à la base de données
-db.connect(err => {
-    if (err) {
-        console.error("Erreur de connexion à MySQL:", err);
-        setTimeout(handleDisconnect, 2000);
-        return;
-    }
-    console.log("Connecté à MySQL");
-
-    // Création de la table users
+// Initialisation de la base de données
+function initializeDatabase() {
     const createTableQuery = `
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -81,51 +98,18 @@ db.connect(err => {
         }
         console.log("Table users vérifiée/créée");
     });
+}
+
+// Première connexion à la base de données
+db.connect(err => {
+    if (err) {
+        console.error("Erreur de connexion à MySQL:", err);
+        setTimeout(handleDisconnect, 2000);
+        return;
+    }
+    console.log("Connecté à MySQL");
+    initializeDatabase();
 });
-
-// Configuration du store de session
-const sessionStore = new MySQLStore(dbConfig);
-
-// Modifiez la configuration de la session
-const sessionMiddleware = session({
-  secret: 'your_secret_key',
-  resave: true,                 // Changé à true
-  saveUninitialized: true,      // Changé à true
-  store: new MySQLStore({
-      host: "kil9uzd3tgem3naa.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
-      user: "vq59kak6l2fnh7wb",
-      password: "fro27g39ovtnax2m",
-      database: "hv3q4ftkopxrnj0n",
-      port: 3306,
-      clearExpired: true,
-      checkExpirationInterval: 900000,
-      expiration: 86400000,
-      createDatabaseTable: true
-  }),
-  cookie: {
-      secure: true,             // true car vous utilisez HTTPS sur Heroku
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000 // 24 heures
-  }
-});
-
-// Assurez-vous d'utiliser le middleware avant les routes
-app.use(sessionMiddleware);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Port du serveur
-const PORT = process.env.PORT || 3000;
-
-// Middleware
-app.use(express.static('public'));
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-
-// Maps pour le jeu
-const onlinePlayers = new Map();
-const games = {};
-const matchRequests = new Map();
 
 // Middleware d'authentification
 function requireLogin(req, res, next) {
@@ -137,7 +121,7 @@ function requireLogin(req, res, next) {
     }
 }
 
-// Routes principales
+// Routes d'authentification
 app.get('/', (req, res) => {
     if (req.session && req.session.loggedin) {
         res.redirect('/accueil');
@@ -156,93 +140,84 @@ app.get('/register', (req, res) => {
 
 app.post("/register", (req, res) => {
     const { username, password } = req.body;
-    if (username && password) {
-        bcrypt.hash(password, 8, (err, hash) => {
-            if (err) {
-                console.error("Erreur hash:", err);
-                return res.status(500).send("Erreur d'enregistrement");
-            }
-            db.query(
-                "INSERT INTO users (username, password) VALUES (?, ?)",
-                [username, hash],
-                (err) => {
-                    if (err) {
-                        return res.status(500).send("Erreur d'enregistrement");
-                    }
-                    res.redirect("/login");
-                }
-            );
-        });
-    } else {
-        res.status(400).send("Veuillez remplir tous les champs");
+    if (!username || !password) {
+        return res.status(400).send("Veuillez remplir tous les champs");
     }
+
+    bcrypt.hash(password, 8, (err, hash) => {
+        if (err) {
+            console.error("Erreur hash:", err);
+            return res.status(500).send("Erreur d'enregistrement");
+        }
+        
+        db.query(
+            "INSERT INTO users (username, password) VALUES (?, ?)",
+            [username, hash],
+            (err) => {
+                if (err) {
+                    return res.status(500).send("Erreur d'enregistrement");
+                }
+                res.redirect("/login");
+            }
+        );
+    });
 });
 
-app.post("/login", (req, res) => {
-  const { username, password } = req.body;
-  console.log("1. Tentative de connexion pour:", username);
+app.post("/login", async (req, res) => {
+    const { username, password } = req.body;
+    console.log("Tentative de connexion pour:", username);
 
-  if (username && password) {
-      db.query(
-          "SELECT * FROM users WHERE username = ?",
-          [username],
-          (err, results) => {
-              if (err) {
-                  console.error("2. Erreur SQL:", err);
-                  return res.status(500).send("Erreur serveur");
-              }
-              console.log("3. Résultats de la requête:", results);
+    if (!username || !password) {
+        return res.status(400).send("Veuillez remplir tous les champs");
+    }
 
-              if (results.length > 0) {
-                  console.log("4. Mot de passe hasché en DB:", results[0].password);
-                  bcrypt.compare(password, results[0].password, (err, match) => {
-                      console.log("5. Résultat du compare:", match);
-                      if (err) {
-                          console.error("6. Erreur bcrypt:", err);
-                          return res.status(500).send("Erreur serveur");
-                      }
-                      if (match) {
-                          req.session.loggedin = true;
-                          req.session.username = username;
-                          console.log("7. Session avant save:", req.session);
-                          
-                          req.session.save((err) => {
-                              if (err) {
-                                  console.error("8. Erreur save session:", err);
-                                  return res.status(500).send("Erreur session");
-                              }
-                              console.log("9. Session sauvegardée, redirection vers accueil");
-                              return res.redirect("/accueil");
-                          });
-                      } else {
-                          console.log("10. Mot de passe incorrect");
-                          res.status(401).send("Mot de passe incorrect");
-                      }
-                  });
-              } else {
-                  console.log("11. Utilisateur non trouvé");
-                  res.status(404).send("Utilisateur non trouvé");
-              }
-          }
-      );
-  } else {
-      console.log("12. Champs manquants");
-      res.status(400).send("Veuillez remplir tous les champs");
-  }
+    db.query(
+        "SELECT * FROM users WHERE username = ?",
+        [username],
+        async (err, results) => {
+            if (err) {
+                console.error("Erreur SQL:", err);
+                return res.status(500).send("Erreur serveur");
+            }
+
+            if (results.length === 0) {
+                return res.status(404).send("Utilisateur non trouvé");
+            }
+
+            try {
+                const match = await bcrypt.compare(password, results[0].password);
+                if (!match) {
+                    return res.status(401).send("Mot de passe incorrect");
+                }
+
+                // Création de la session
+                req.session.loggedin = true;
+                req.session.username = username;
+                req.session.userId = results[0].id;
+
+                req.session.save((err) => {
+                    if (err) {
+                        console.error("Erreur sauvegarde session:", err);
+                        return res.status(500).send("Erreur session");
+                    }
+                    res.redirect("/accueil");
+                });
+            } catch (error) {
+                console.error("Erreur bcrypt:", error);
+                res.status(500).send("Erreur serveur");
+            }
+        }
+    );
 });
 
 app.get('/accueil', (req, res) => {
-  console.log("A. Accès à /accueil");
-  console.log("B. Session complète:", req.session);
-  console.log("C. loggedin:", req.session.loggedin);
-  
-  if (req.session && req.session.loggedin) {
-      console.log("D. Envoi de accueil.html");
-      res.sendFile(path.join(__dirname, 'public', 'accueil.html'));
-  } else {
-      console.log("E. Redirection vers login");
-      res.redirect('/login');
-  }
+    console.log("Session à l'accueil:", req.session);
+    
+    if (req.session && req.session.loggedin) {
+        res.sendFile(path.join(__dirname, 'public', 'accueil.html'));
+    } else {
+        res.redirect('/login');
+    }
 });
 
 app.get('/game', requireLogin, (req, res) => {
@@ -250,10 +225,11 @@ app.get('/game', requireLogin, (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
-    if (req.session.username) {
-        // Suppression du joueur des joueurs en ligne
+    const username = req.session?.username;
+    if (username) {
+        // Nettoyage des joueurs en ligne
         for (const [socketId, player] of onlinePlayers.entries()) {
-            if (player.username === req.session.username) {
+            if (player.username === username) {
                 onlinePlayers.delete(socketId);
                 io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
                 break;
@@ -262,14 +238,12 @@ app.get('/logout', (req, res) => {
     }
 
     req.session.destroy(err => {
-        if (err) {
-            console.error("Erreur déconnexion:", err);
-        }
+        if (err) console.error("Erreur déconnexion:", err);
         res.redirect("/login");
     });
 });
 
-// Socket.IO Middleware
+// Configuration Socket.IO
 io.use((socket, next) => {
     sessionMiddleware(socket.request, socket.request.res || {}, next);
 });
@@ -277,19 +251,19 @@ io.use((socket, next) => {
 // Gestion des connexions Socket.IO
 io.on("connection", (socket) => {
     console.log("Nouvelle connexion:", socket.id);
-
     const userDisconnectTimeouts = new Map();
 
-    // Ajout du joueur connecté
+    // Gestion de l'authentification socket
     if (socket.request.session?.username) {
         const username = socket.request.session.username;
 
+        // Gestion des timeouts de déconnexion
         if (userDisconnectTimeouts.has(username)) {
             clearTimeout(userDisconnectTimeouts.get(username));
             userDisconnectTimeouts.delete(username);
         }
 
-        // Mise à jour des connexions existantes
+        // Mise à jour des connexions
         for (const [oldSocketId, player] of onlinePlayers.entries()) {
             if (player.username === username) {
                 onlinePlayers.delete(oldSocketId);
@@ -298,7 +272,7 @@ io.on("connection", (socket) => {
         }
 
         onlinePlayers.set(socket.id, {
-            username: username,
+            username,
             inGame: false,
             id: socket.id
         });
@@ -306,7 +280,7 @@ io.on("connection", (socket) => {
         io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
     }
 
-    // Gestion des événements socket
+    // Gestion des événements de jeu
     socket.on("requestOnlinePlayers", () => {
         socket.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
     });
@@ -323,6 +297,7 @@ io.on("connection", (socket) => {
             }
         );
     });
+
 // Gestion de la mise à terre
   socket.on("miseATerre", ({ gameId }) => {
     if (!games[gameId]) return;
@@ -695,69 +670,40 @@ io.on("connection", (socket) => {
       io.to(gameId).emit("timerUpdate", games[gameId].gameState.timers);
     }
   });
-  // Gestion de la déconnexion
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    socket.on("disconnect", () => {
+        const playerInfo = onlinePlayers.get(socket.id);
+        if (!playerInfo) return;
 
-    const playerInfo = onlinePlayers.get(socket.id);
-    if (!playerInfo) return;
+        const username = playerInfo.username;
+        const timeout = setTimeout(() => {
+            const reconnected = Array.from(onlinePlayers.values())
+                .some(p => p.username === username && p.id !== socket.id);
 
-    const username = playerInfo.username;
+            if (!reconnected) {
+                onlinePlayers.delete(socket.id);
+                io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
 
-    // Créer un timeout pour la déconnexion
-    const timeout = setTimeout(() => {
-      // Vérifier si le joueur n'est pas déjà reconnecté
-      const reconnected = Array.from(onlinePlayers.values()).some(
-        (p) => p.username === username && p.id !== socket.id
-      );
-
-      if (!reconnected) {
-        onlinePlayers.delete(socket.id);
-        io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
-
-        // Gérer la déconnexion dans les parties
-        for (const [gameId, game] of Object.entries(games)) {
-          const playerIndex = game.players.findIndex((p) => p.id === socket.id);
-          if (playerIndex !== -1) {
-            game.players.splice(playerIndex, 1);
-            if (game.players.length === 1) {
-              io.to(gameId).emit("playerDisconnected");
-            } else if (game.players.length === 0) {
-              delete games[gameId];
+                // Nettoyage des parties
+                for (const [gameId, game] of Object.entries(games)) {
+                    const playerIndex = game.players.findIndex(p => p.id === socket.id);
+                    if (playerIndex !== -1) {
+                        game.players.splice(playerIndex, 1);
+                        if (game.players.length === 1) {
+                            io.to(gameId).emit("playerDisconnected");
+                        } else if (game.players.length === 0) {
+                            delete games[gameId];
+                        }
+                    }
+                }
             }
-          }
-        }
-      }
-    }, 5000); // 5 secondes de délai
+        }, 5000);
 
-    userDisconnectTimeouts.set(username, timeout);
-  });
-
-  // Gestion de la tentative de reconnexion
-  socket.on("reconnect_attempt", () => {
-    const username = socket.request.session?.username;
-    if (username && userDisconnectTimeouts.has(username)) {
-      clearTimeout(userDisconnectTimeouts.get(username));
-      userDisconnectTimeouts.delete(username);
-    }
-  });
-
-  // Nettoyage lors de la déconnexion explicite
-  socket.on("logout", () => {
-    const playerInfo = onlinePlayers.get(socket.id);
-    if (playerInfo) {
-      const username = playerInfo.username;
-      if (userDisconnectTimeouts.has(username)) {
-        clearTimeout(userDisconnectTimeouts.get(username));
-        userDisconnectTimeouts.delete(username);
-      }
-      onlinePlayers.delete(socket.id);
-      io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
-    }
-  });
+        userDisconnectTimeouts.set(username, timeout);
+    });
 });
 
 // Démarrage du serveur
+const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log(`Serveur démarré sur le port ${PORT}`);
 });
