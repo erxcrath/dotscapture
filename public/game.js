@@ -198,7 +198,7 @@ function startMainTimer() {
                 emitTimerUpdate();
             } else {
                 clearInterval(activeTimer);
-                handleTimeOut();
+                handleTimeOut(); // Cette fonction déclenchera maintenant le gameEnded pour les deux joueurs
             }
         } else {
             if (player2Time > 0) {
@@ -246,17 +246,6 @@ function updateTimerDisplay() {
     document.querySelector('.player2-avatar').classList.toggle('active', currentTurn === 'player2');
 }
 
-function handleTimeOut() {
-    // Gérer la fin du temps pour un joueur
-    const loser = currentTurn === 'player1' ? 'player1Name' : 'player2Name';
-    const loserName = document.getElementById(loser).textContent;
-    alert(`Temps écoulé pour ${loserName} !`);
-    // Émettre un événement de fin de partie
-    socket.emit('gameOver', {
-        gameId: localStorage.getItem('gameId'),
-        winner: currentTurn === 'player1' ? 'player2' : 'player1'
-    });
-}
 
 function drawShapesAndLines() {
     for (let outline of outlines) {
@@ -335,21 +324,81 @@ socket.on('checkCapturesAndEndGame', () => {
     }, 500);
 });
 
-// Modifier la fonction handleMiseATerre
-function handleMiseATerre() {
+function handleAbandon() {
     if (myPlayerType !== currentTurn) {
         alert("Ce n'est pas votre tour !");
         return;
     }
     
-    if (confirm("Êtes-vous sûr de vouloir utiliser la mise à terre ? Cela terminera la partie !")) {
-        socket.emit('miseATerre', {
-            gameId: localStorage.getItem('gameId')
+    if (confirm("Êtes-vous sûr de vouloir abandonner la partie ?")) {
+        const gameId = localStorage.getItem('gameId');
+        socket.emit('abandonGame', {
+            gameId: gameId,
+            player: myPlayerType
         });
-        // Désactiver immédiatement le bouton
-        document.getElementById('miseATerreBtn').disabled = true;
     }
 }
+  
+  // Modifier la fonction handleTimeOut existante
+  function handleTimeOut() {
+    const gameId = localStorage.getItem('gameId');
+    const loser = currentTurn;
+    const winner = currentTurn === 'player1' ? 'player2' : 'player1';
+    
+    socket.emit('timeoutGame', {
+        gameId: gameId,
+        loser: loser,
+        winner: winner
+    });
+}
+
+// Modifier la fonction handleMiseATerre
+function handleMiseATerre() {
+    if (myPlayerType !== currentTurn) {
+      alert("Ce n'est pas votre tour !");
+      return;
+    }
+    
+    if (confirm("Êtes-vous sûr de vouloir utiliser la mise à terre ? Cela terminera la partie !")) {
+      const gameId = localStorage.getItem('gameId');
+      socket.emit('miseATerre', {
+        gameId: gameId,
+        player: myPlayerType
+      });
+    }
+  }
+
+  // Fonction pour afficher la modal de fin de partie
+function showEndGameModal(title, message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade show';
+    modal.style.display = 'block';
+    modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    
+    modal.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">${title}</h5>
+          </div>
+          <div class="modal-body">
+            <p>${message}</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" onclick="returnToHome()">Retour à l'accueil</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+  }
+  
+  function returnToHome() {
+    window.location.href = '/accueil';
+  }
+
+
 
 // Fonction pour vérifier si un point est dans la zone de départ centrale
 function isValidStartingPosition(x, y) {
@@ -715,7 +764,52 @@ socket.on('scoreUpdated', (gameState) => {
     }
     
     // Redessiner le jeu
+   
     draw();
+});
+
+// Dans game.js, ajouter ce gestionnaire d'événement
+socket.on('gameEnded', (data) => {
+    // Arrêter tous les timers immédiatement
+    if (activeTimer) clearInterval(activeTimer);
+    if (reflectionTimer) clearInterval(reflectionTimer);
+
+    let modalTitle, modalMessage;
+    
+    switch(data.reason) {
+        case 'timeout':
+            modalTitle = 'Temps écoulé';
+            modalMessage = data.message;
+            break;
+        case 'abandon':
+            modalTitle = 'Abandon de partie';
+            modalMessage = data.message;
+            break;
+        case 'miseATerre':
+            modalTitle = 'Mise à terre';
+            modalMessage = data.message;
+            break;
+        default:
+            modalTitle = 'Fin de partie';
+            modalMessage = data.message;
+    }
+    
+    // Ajouter les informations ELO si disponibles
+    if (data.finalScores) {
+        modalMessage += '<br><br>Résultats ELO :<br>';
+        modalMessage += `${data.finalScores.player1.username}: ${data.finalScores.player1.oldElo} → ${data.finalScores.player1.newElo} (${data.finalScores.player1.scoreDiff >= 0 ? '+' : ''}${data.finalScores.player1.scoreDiff})<br>`;
+        modalMessage += `${data.finalScores.player2.username}: ${data.finalScores.player2.oldElo} → ${data.finalScores.player2.newElo} (${data.finalScores.player2.scoreDiff >= 0 ? '+' : ''}${data.finalScores.player2.scoreDiff})`;
+    }
+
+    showEndGameModal(modalTitle, modalMessage);
+    
+    // Nettoyer les données locales
+    localStorage.removeItem('gameId');
+    
+    // Rediriger vers l'accueil après un délai
+    setTimeout(() => {
+        window.location.href = '/accueil';
+    }, 5000);
 });
 socket.on('connect', () => {
     console.log('Socket connected:', socket.id);

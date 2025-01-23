@@ -4,9 +4,9 @@ const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 const mysql = require("mysql2");
 const session = require("express-session");
-const MySQLStore = require('express-mysql-session')(session);
+const MySQLStore = require("express-mysql-session")(session);
 const bcrypt = require("bcryptjs");
-const bodyParser = require("body-parser");  // Ajout de cette ligne
+const bodyParser = require("body-parser"); // Ajout de cette ligne
 
 // Configuration de la base de données
 const dbConfig = {
@@ -14,7 +14,7 @@ const dbConfig = {
   user: "vq59kak6l2fnh7wb",
   password: "fro27g39ovtnax2m",
   database: "hv3q4ftkopxrnj0n",
-  port: 3306
+  port: 3306,
 };
 
 // Créer la connexion à la base de données
@@ -31,15 +31,18 @@ const sessionMiddleware = session({
   store: sessionStore,
   cookie: {
     secure: false, // Mettre à true si vous utilisez HTTPS
-    maxAge: 24 * 60 * 60 * 1000 // 24 heures
-  }
+    maxAge: 24 * 60 * 60 * 1000, // 24 heures
+  },
 });
+
+// Constantes pour le calcul ELO
+const ELO_K_FACTOR = 32;
 
 // Configuration du port
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(express.static('public'));
+app.use(express.static("public"));
 app.use(sessionMiddleware);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -80,7 +83,6 @@ db.on("error", (err) => {
   }
 });
 
-
 // Garder une trace des joueurs en ligne
 const onlinePlayers = new Map();
 const games = {};
@@ -89,7 +91,7 @@ const games = {};
 const matchRequests = new Map(); // Pour stocker les demandes de match en cours
 
 // Configurer correctement les fichiers statiques
-app.use(express.static('public'));
+app.use(express.static("public"));
 
 // Utiliser la session dans Express
 app.use(sessionMiddleware);
@@ -106,16 +108,24 @@ function requireLogin(req, res, next) {
   }
 }
 
+// Fonction de calcul ELO
+function calculateNewElo(playerElo, opponentElo, score) {
+  const expectedScore = 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
+  return Math.round(playerElo + ELO_K_FACTOR * (score - expectedScore));
+}
+
 // Middleware d'authentification simplifié
 app.use((req, res, next) => {
   // Liste des chemins autorisés sans authentification
-  const publicPaths = ['/login', '/register'];
-  
+  const publicPaths = ["/login", "/register"];
+
   // Autoriser l'accès aux fichiers statiques et aux chemins publics
-  if (req.path.startsWith('/css') || 
-      req.path.startsWith('/js') || 
-      req.path.startsWith('/public') || 
-      publicPaths.includes(req.path)) {
+  if (
+    req.path.startsWith("/css") ||
+    req.path.startsWith("/js") ||
+    req.path.startsWith("/public") ||
+    publicPaths.includes(req.path)
+  ) {
     return next();
   }
 
@@ -123,94 +133,94 @@ app.use((req, res, next) => {
   if (req.session && req.session.loggedin) {
     return next();
   }
-  
+
   // Rediriger vers login si non authentifié
-  res.redirect('/login');
+  res.redirect("/login");
 });
 
 // Routes principales
-app.get('/', (req, res) => {
+app.get("/", (req, res) => {
   if (req.session && req.session.loggedin) {
-    res.redirect('/accueil');
+    res.redirect("/accueil");
   } else {
-    res.redirect('/login');
+    res.redirect("/login");
   }
 });
 
 // Ajouter des logs pour le débogage
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
-  console.log('Tentative de connexion pour:', username);
-  
+  console.log("Tentative de connexion pour:", username);
+
   if (username && password) {
     db.query(
       "SELECT * FROM users WHERE username = ?",
       [username],
       (err, results) => {
         if (err) {
-          console.error('Erreur SQL:', err);
+          console.error("Erreur SQL:", err);
           throw err;
         }
         if (results.length > 0) {
           bcrypt.compare(password, results[0].password, (err, match) => {
             if (match) {
-              console.log('Connexion réussie pour:', username);
+              console.log("Connexion réussie pour:", username);
               req.session.loggedin = true;
               req.session.username = username;
               req.session.save((err) => {
                 if (err) {
-                  console.error('Erreur de sauvegarde de session:', err);
-                  res.status(500).send('Erreur de session');
+                  console.error("Erreur de sauvegarde de session:", err);
+                  res.status(500).send("Erreur de session");
                 } else {
                   res.redirect("/accueil");
                 }
               });
             } else {
-              console.log('Mot de passe incorrect pour:', username);
+              console.log("Mot de passe incorrect pour:", username);
               res.status(401).send("Incorrect password!");
             }
           });
         } else {
-          console.log('Utilisateur non trouvé:', username);
+          console.log("Utilisateur non trouvé:", username);
           res.status(404).send("User not found");
         }
       }
     );
   } else {
-    console.log('Données de connexion manquantes');
+    console.log("Données de connexion manquantes");
     res.status(400).send("Please enter username and password");
   }
 });
-app.get('/accueil', (req, res) => {
-  console.log('Tentative d\'accès à /accueil');
-  console.log('Session:', req.session);
-  console.log('LoggedIn:', req.session?.loggedin);
-  console.log('Directory:', __dirname);
-  
+app.get("/accueil", (req, res) => {
+  console.log("Tentative d'accès à /accueil");
+  console.log("Session:", req.session);
+  console.log("LoggedIn:", req.session?.loggedin);
+  console.log("Directory:", __dirname);
+
   if (req.session && req.session.loggedin) {
-    const filePath = __dirname + '/public/accueil.html';
-    console.log('Chemin du fichier:', filePath);
-    
+    const filePath = __dirname + "/public/accueil.html";
+    console.log("Chemin du fichier:", filePath);
+
     // Vérifier si le fichier existe
-    if (require('fs').existsSync(filePath)) {
-      console.log('Le fichier accueil.html existe');
+    if (require("fs").existsSync(filePath)) {
+      console.log("Le fichier accueil.html existe");
       res.sendFile(filePath);
     } else {
-      console.log('Le fichier accueil.html n\'existe pas');
-      res.status(404).send('Page non trouvée');
+      console.log("Le fichier accueil.html n'existe pas");
+      res.status(404).send("Page non trouvée");
     }
   } else {
-    console.log('Utilisateur non authentifié, redirection vers /login');
-    res.redirect('/login');
+    console.log("Utilisateur non authentifié, redirection vers /login");
+    res.redirect("/login");
   }
 });
 
-app.get('/login', (req, res) => {
-  res.sendFile(__dirname + '/public/login.html');
+app.get("/login", (req, res) => {
+  res.sendFile(__dirname + "/public/login.html");
 });
 
-app.get('/register', (req, res) => {
-  res.sendFile(__dirname + '/public/register.html');
+app.get("/register", (req, res) => {
+  res.sendFile(__dirname + "/public/register.html");
 });
 
 app.post("/register", (req, res) => {
@@ -291,7 +301,7 @@ app.get("/logout", (req, res) => {
 });
 
 // Ajouter une route pour vérifier l'état de la session
-app.get('/check-session', (req, res) => {
+app.get("/check-session", (req, res) => {
   if (req.session && req.session.loggedin) {
     res.json({ authenticated: true, username: req.session.username });
   } else {
@@ -300,14 +310,13 @@ app.get('/check-session', (req, res) => {
 });
 
 // Route de débogage
-app.get('/debug-session', (req, res) => {
+app.get("/debug-session", (req, res) => {
   res.json({
     session: req.session,
     loggedin: req.session?.loggedin,
-    username: req.session?.username
+    username: req.session?.username,
   });
 });
-
 
 // Attacher la session à Socket.IO
 io.use((socket, next) => {
@@ -385,64 +394,370 @@ io.on("connection", (socket) => {
     );
   });
 
+  // Dans server.js, remplacer le gestionnaire d'abandon existant
+socket.on('abandonGame', async ({ gameId, player }) => {
+  const game = games[gameId];
+  if (!game) return;
+
+  try {
+      const winner = player === 'player1' ? 'player2' : 'player1';
+      const player1 = game.players.find(p => p.type === 'player1');
+      const player2 = game.players.find(p => p.type === 'player2');
+
+      // Récupérer les scores ELO actuels
+      const [player1Data, player2Data] = await Promise.all([
+          queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
+          queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
+      ]);
+
+      const player1Elo = player1Data[0]?.score || 1500;
+      const player2Elo = player2Data[0]?.score || 1500;
+
+      // En cas d'abandon, le gagnant reçoit un score de 1 et le perdant 0
+      const player1Score = winner === 'player1' ? 1 : 0;
+      const player2Score = 1 - player1Score;
+
+      // Calculer les nouveaux scores ELO
+      const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, player1Score);
+      const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, player2Score);
+
+      // Mettre à jour les scores dans la base de données
+      await Promise.all([
+          queryAsync(
+              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ?',
+              [newPlayer1Elo, player1.username]
+          ),
+          queryAsync(
+              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ?',
+              [newPlayer2Elo, player2.username]
+          )
+      ]);
+
+      // Envoyer les résultats détaillés
+      io.to(gameId).emit('gameEnded', {
+          reason: 'abandon',
+          winner: winner,
+          message: `${player === 'player1' ? 'Joueur 1' : 'Joueur 2'} a abandonné la partie`,
+          finalScores: {
+              player1: {
+                  username: player1.username,
+                  oldElo: player1Elo,
+                  newElo: newPlayer1Elo,
+                  scoreDiff: newPlayer1Elo - player1Elo
+              },
+              player2: {
+                  username: player2.username,
+                  oldElo: player2Elo,
+                  newElo: newPlayer2Elo,
+                  scoreDiff: newPlayer2Elo - player2Elo
+              }
+          }
+      });
+
+      // Nettoyer la partie
+      delete games[gameId];
+
+  } catch (error) {
+      console.error('Erreur lors de la gestion de l\'abandon:', error);
+      io.to(gameId).emit('gameError', {
+          message: 'Une erreur est survenue lors de la finalisation de la partie'
+      });
+  }
+});
+
+socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
+  const game = games[gameId];
+  if (!game) return;
+
+  try {
+      const player1 = game.players.find(p => p.type === 'player1');
+      const player2 = game.players.find(p => p.type === 'player2');
+
+      // Récupérer les scores ELO actuels
+      const [player1Data, player2Data] = await Promise.all([
+          queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
+          queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
+      ]);
+
+      const player1Elo = player1Data[0]?.score || 1500;
+      const player2Elo = player2Data[0]?.score || 1500;
+
+      // En cas de timeout, le perdant reçoit un score de 0 et le gagnant 1
+      const player1Score = winner === 'player1' ? 1 : 0;
+      const player2Score = 1 - player1Score;
+
+      // Calculer les nouveaux scores ELO
+      const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, player1Score);
+      const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, player2Score);
+
+      // Mettre à jour les scores dans la base de données
+      await Promise.all([
+          queryAsync(
+              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ?',
+              [newPlayer1Elo, player1.username]
+          ),
+          queryAsync(
+              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ?',
+              [newPlayer2Elo, player2.username]
+          )
+      ]);
+
+      const loserName = loser === 'player1' ? player1.username : player2.username;
+
+      // Envoyer les résultats détaillés aux deux joueurs
+      io.to(gameId).emit('gameEnded', {
+          reason: 'timeout',
+          winner: winner,
+          message: `Partie terminée : Temps écoulé pour ${loserName}`,
+          finalScores: {
+              player1: {
+                  username: player1.username,
+                  oldElo: player1Elo,
+                  newElo: newPlayer1Elo,
+                  scoreDiff: newPlayer1Elo - player1Elo
+              },
+              player2: {
+                  username: player2.username,
+                  oldElo: player2Elo,
+                  newElo: newPlayer2Elo,
+                  scoreDiff: newPlayer2Elo - player2Elo
+              }
+          }
+      });
+
+      // Nettoyer la partie
+      delete games[gameId];
+
+  } catch (error) {
+      console.error('Erreur lors de la gestion du timeout:', error);
+      io.to(gameId).emit('gameError', {
+          message: 'Une erreur est survenue lors de la finalisation de la partie'
+      });
+  }
+});
+
   // Gestion de la mise à terre
-  socket.on("miseATerre", ({ gameId }) => {
+  socket.on("miseATerre", async ({ gameId }) => {
     if (!games[gameId]) return;
 
     const game = games[gameId];
+    // Ajouter un flag pour indiquer que la partie est en mode mise à terre
+    game.isMiseATerre = true;
+    
     const currentPlayer = game.players.find((p) => p.id === socket.id);
 
     if (!currentPlayer || currentPlayer.type !== game.gameState.currentTurn)
-      return;
+        return;
 
     const playerDots = game.gameState.dots.filter(
-      (dot) => dot.type === currentPlayer.type
+        (dot) => dot.type === currentPlayer.type
     );
-    const opponentType =
-      currentPlayer.type === "player1" ? "player2" : "player1";
+    const opponentType = currentPlayer.type === "player1" ? "player2" : "player1";
 
     // Pour chaque point du joueur, vérifier les cases adjacentes vides
     const newDots = [];
     const existingPositions = new Set(
-      game.gameState.dots.map((dot) => `${dot.x},${dot.y}`)
+        game.gameState.dots.map((dot) => `${dot.x},${dot.y}`)
     );
 
     playerDots.forEach((dot) => {
-      // Vérifier les 8 positions adjacentes
-      [
-        [-1, -1],
-        [-1, 0],
-        [-1, 1],
-        [0, -1],
-        [0, 1],
-        [1, -1],
-        [1, 0],
-        [1, 1],
-      ].forEach(([dx, dy]) => {
-        const newX = dot.x + dx;
-        const newY = dot.y + dy;
+        [
+            [-1, -1], [-1, 0], [-1, 1],
+            [0, -1], [0, 1],
+            [1, -1], [1, 0], [1, 1]
+        ].forEach(([dx, dy]) => {
+            const newX = dot.x + dx;
+            const newY = dot.y + dy;
 
-        if (
-          newX >= 0 &&
-          newX < 39 &&
-          newY >= 0 &&
-          newY < 32 &&
-          !existingPositions.has(`${newX},${newY}`)
-        ) {
-          newDots.push({ x: newX, y: newY, type: opponentType });
-          existingPositions.add(`${newX},${newY}`);
+            if (
+                newX >= 0 &&
+                newX < 39 &&
+                newY >= 0 &&
+                newY < 32 &&
+                !existingPositions.has(`${newX},${newY}`)
+            ) {
+                newDots.push({ x: newX, y: newY, type: opponentType });
+                existingPositions.add(`${newX},${newY}`);
+            }
+        });
+    });
+
+    // Ajouter tous les nouveaux points d'un coup
+    game.gameState.dots.push(...newDots);
+    
+    // Notifier tous les nouveaux points
+    for (const newDot of newDots) {
+        io.to(gameId).emit("dotPlaced", newDot);
+    }
+
+    // Attendre un court instant pour que les captures soient calculées
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Gérer la fin de partie et le calcul ELO
+    try {
+        const player1 = game.players.find(p => p.type === 'player1');
+        const player2 = game.players.find(p => p.type === 'player2');
+
+        const [player1Data, player2Data] = await Promise.all([
+            queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
+            queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
+        ]);
+
+        const player1Elo = player1Data[0]?.score || 1500;
+        const player2Elo = player2Data[0]?.score || 1500;
+
+        // Déterminer le gagnant basé sur le score final
+        const player1Score = game.gameState.scoreRed > game.gameState.scoreBlue ? 1 : 0;
+        const player2Score = 1 - player1Score;
+
+        // Calculer les nouveaux scores ELO
+        const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, player1Score);
+        const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, player2Score);
+
+        // Une seule mise à jour par joueur pour la partie entière
+        await Promise.all([
+            queryAsync(
+                'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ? AND NOT EXISTS (SELECT 1 FROM game_history WHERE game_id = ? AND player_username = ?)',
+                [newPlayer1Elo, player1.username, gameId, player1.username]
+            ),
+            queryAsync(
+                'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ? AND NOT EXISTS (SELECT 1 FROM game_history WHERE game_id = ? AND player_username = ?)',
+                [newPlayer2Elo, player2.username, gameId, player2.username]
+            )
+        ]);
+
+        // Enregistrer l'historique de la partie une seule fois
+        if (!game.historyRecorded) {
+            await queryAsync(
+                'INSERT IGNORE INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+                [gameId, player1.username, player2.username, player1Score, 'miseATerre']
+            );
+            game.historyRecorded = true;
         }
-      });
-    });
 
-    // Ajouter les nouveaux points et terminer la partie
-    newDots.forEach((newDot) => {
-      game.gameState.dots.push(newDot);
-      io.to(gameId).emit("dotPlaced", newDot);
-    });
+        // Envoyer le résultat final
+        io.to(gameId).emit('gameEnded', {
+            reason: 'miseATerre',
+            winner: player1Score > player2Score ? 'player1' : 'player2',
+            message: 'Partie terminée par mise à terre',
+            finalScores: {
+                player1: {
+                    username: player1.username,
+                    oldElo: player1Elo,
+                    newElo: newPlayer1Elo,
+                    scoreDiff: newPlayer1Elo - player1Elo
+                },
+                player2: {
+                    username: player2.username,
+                    oldElo: player2Elo,
+                    newElo: newPlayer2Elo,
+                    scoreDiff: newPlayer2Elo - player2Elo
+                }
+            }
+        });
 
-    io.to(gameId).emit("checkCapturesAndEndGame");
+        // Nettoyer la partie
+        delete games[gameId];
+
+    } catch (error) {
+        console.error('Erreur lors de la finalisation de la partie:', error);
+        io.to(gameId).emit('gameError', {
+            message: 'Une erreur est survenue lors de la finalisation de la partie'
+        });
+    }
+});
+  socket.on('gameOver', async ({ gameId, winner, reason }) => {
+    await handleGameEnd(gameId, winner, reason);
+    
+    io.to(gameId).emit('gameEnded', {
+      reason: reason,
+      winner: winner,
+      message: `Partie terminée - ${reason}`
+    });
   });
+
+  // Fonction de gestion de fin de partie
+// Dans server.js - Modifier la fonction handleGameEnd
+async function handleGameEnd(gameId, winner, reason) {
+  const game = games[gameId];
+  if (!game || game.gameEnded) return; // Empêcher le double comptage
+  
+  try {
+      // Marquer la partie comme terminée
+      game.gameEnded = true;
+      
+      const player1 = game.players.find(p => p.type === 'player1');
+      const player2 = game.players.find(p => p.type === 'player2');
+
+      const [player1Data, player2Data] = await Promise.all([
+          queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
+          queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
+      ]);
+
+      const player1Elo = player1Data[0]?.score || 1500;
+      const player2Elo = player2Data[0]?.score || 1500;
+
+      // Déterminer les scores selon la raison
+      let p1Score, p2Score;
+      switch (reason) {
+          case 'miseATerre':
+              p1Score = game.gameState.scoreRed > game.gameState.scoreBlue ? 1 : 0;
+              p2Score = 1 - p1Score;
+              break;
+          case 'abandon':
+          case 'timeout':
+              p1Score = winner === 'player1' ? 1 : 0;
+              p2Score = 1 - p1Score;
+              break;
+          default:
+              p1Score = 0.5;
+              p2Score = 0.5;
+      }
+
+      const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, p1Score);
+      const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, p2Score);
+
+      // Mettre à jour les scores ELO mais incrémenter games_played une seule fois
+      await Promise.all([
+          queryAsync(
+              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ? AND NOT EXISTS (SELECT 1 FROM game_history WHERE game_id = ? AND player_username = ?)',
+              [newPlayer1Elo, player1.username, gameId, player1.username]
+          ),
+          queryAsync(
+              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ? AND NOT EXISTS (SELECT 1 FROM game_history WHERE game_id = ? AND player_username = ?)',
+              [newPlayer2Elo, player2.username, gameId, player2.username]
+          )
+      ]);
+
+      // Enregistrer l'historique de la partie
+      await queryAsync(
+          'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+          [gameId, player1.username, player2.username, p1Score, reason]
+      );
+
+      // Nettoyer la partie
+      delete games[gameId];
+      
+      return {
+          player1: { oldElo: player1Elo, newElo: newPlayer1Elo },
+          player2: { oldElo: player2Elo, newElo: newPlayer2Elo }
+      };
+  } catch (error) {
+      console.error('Erreur lors de la fin de partie:', error);
+      throw error;
+  }
+}
+
+// Fonction utilitaire pour les promesses MySQL
+function queryAsync(sql, values) {
+  return new Promise((resolve, reject) => {
+    db.query(sql, values, (err, results) => {
+      if (err) reject(err);
+      else resolve(results);
+    });
+  });
+}
+
 
   // Gestion des demandes de match
   socket.on("requestMatch", (data) => {
@@ -521,126 +836,127 @@ io.on("connection", (socket) => {
     console.log(`Tentative de rejoindre la partie ${gameId}`);
 
     if (!socket.request.session?.loggedin) {
-        socket.emit("notAuthenticated");
-        return;
+      socket.emit("notAuthenticated");
+      return;
     }
 
     if (!games[gameId]) {
-        games[gameId] = {
-            players: [],
-            gameState: {
-                dots: [],
-                scoreRed: 0,
-                scoreBlue: 0,
-                currentTurn: "player1",
-                player1Name: null,
-                player2Name: null,
-                outlines: [],
-                capturedEmpty: [],
-                timers: {
-                    player1Time: 240,
-                    player2Time: 240,
-                    commonReflectionTime: 30,
-                    isReflectionPhase: true
-                }
-            }
-        };
+      games[gameId] = {
+        players: [],
+        gameState: {
+          dots: [],
+          scoreRed: 0,
+          scoreBlue: 0,
+          currentTurn: "player1",
+          player1Name: null,
+          player2Name: null,
+          outlines: [],
+          capturedEmpty: [],
+          timers: {
+            player1Time: 240,
+            player2Time: 240,
+            commonReflectionTime: 30,
+            isReflectionPhase: true,
+          },
+        },
+      };
     }
 
     const existingPlayer = games[gameId].players.find(
-        p => p.username === socket.request.session.username
+      (p) => p.username === socket.request.session.username
     );
 
     if (existingPlayer) {
-        existingPlayer.id = socket.id;
-        socket.join(gameId);
+      existingPlayer.id = socket.id;
+      socket.join(gameId);
 
-        // Préparer l'état du jeu avec les outlines formatées
-        const formattedGameState = {
-            ...games[gameId].gameState,
-            dots: games[gameId].gameState.dots.map(dot => ({
-                x: dot.x,
-                y: dot.y,
-                type: dot.type,
-                captured: dot.captured
-            })),
-            outlines: games[gameId].gameState.outlines.map(outline => 
-                outline.map(point => ({
-                    x: point.x,
-                    y: point.y,
-                    type: point.type === "red" ? "red" : "blue",
-                    c: point.type === "red" ? "#ed2939" : "#4267B2"
-                }))
-            )
-        };
+      // Préparer l'état du jeu avec les outlines formatées
+      const formattedGameState = {
+        ...games[gameId].gameState,
+        dots: games[gameId].gameState.dots.map((dot) => ({
+          x: dot.x,
+          y: dot.y,
+          type: dot.type,
+          captured: dot.captured,
+        })),
+        outlines: games[gameId].gameState.outlines.map((outline) =>
+          outline.map((point) => ({
+            x: point.x,
+            y: point.y,
+            type: point.type === "red" ? "red" : "blue",
+            c: point.type === "red" ? "#ed2939" : "#4267B2",
+          }))
+        ),
+      };
 
-        socket.emit("gameJoined", {
-            playerType: existingPlayer.type,
-            gameState: formattedGameState,
-            gameId: gameId
-        });
-        return;
+      socket.emit("gameJoined", {
+        playerType: existingPlayer.type,
+        gameState: formattedGameState,
+        gameId: gameId,
+      });
+      return;
     }
 
     if (games[gameId].players.length >= 2) {
-        socket.emit("gameFull");
-        return;
+      socket.emit("gameFull");
+      return;
     }
 
-    const playerType = games[gameId].players.length === 0 ? "player1" : "player2";
+    const playerType =
+      games[gameId].players.length === 0 ? "player1" : "player2";
     const username = socket.request.session.username;
 
     if (playerType === "player1") {
-        games[gameId].gameState.player1Name = username;
+      games[gameId].gameState.player1Name = username;
     } else {
-        games[gameId].gameState.player2Name = username;
+      games[gameId].gameState.player2Name = username;
     }
 
     games[gameId].players.push({
-        id: socket.id,
-        type: playerType,
-        username: username
+      id: socket.id,
+      type: playerType,
+      username: username,
     });
 
     // Mettre à jour le statut en partie
     if (onlinePlayers.has(socket.id)) {
-        const player = onlinePlayers.get(socket.id);
-        player.inGame = true;
-        onlinePlayers.set(socket.id, player);
-        io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
+      const player = onlinePlayers.get(socket.id);
+      player.inGame = true;
+      onlinePlayers.set(socket.id, player);
+      io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
     }
 
     socket.join(gameId);
-    
+
     // Préparer l'état du jeu formaté pour le nouveau joueur
     const formattedGameState = {
-        ...games[gameId].gameState,
-        dots: games[gameId].gameState.dots.map(dot => ({
-            x: dot.x,
-            y: dot.y,
-            type: dot.type,
-            captured: dot.captured
-        })),
-        outlines: games[gameId].gameState.outlines.map(outline => 
-            outline.map(point => ({
-                x: point.x,
-                y: point.y,
-                type: point.type === "red" ? "red" : "blue",
-                c: point.type === "red" ? "#ed2939" : "#4267B2"
-            }))
-        )
+      ...games[gameId].gameState,
+      dots: games[gameId].gameState.dots.map((dot) => ({
+        x: dot.x,
+        y: dot.y,
+        type: dot.type,
+        captured: dot.captured,
+      })),
+      outlines: games[gameId].gameState.outlines.map((outline) =>
+        outline.map((point) => ({
+          x: point.x,
+          y: point.y,
+          type: point.type === "red" ? "red" : "blue",
+          c: point.type === "red" ? "#ed2939" : "#4267B2",
+        }))
+      ),
     };
 
     socket.emit("gameJoined", {
-        playerType,
-        gameState: formattedGameState,
-        gameId: gameId
+      playerType,
+      gameState: formattedGameState,
+      gameId: gameId,
     });
 
     if (games[gameId].players.length === 2) {
-        io.to(gameId).emit("gameStart", formattedGameState);
+      io.to(gameId).emit("gameStart", formattedGameState);
     }
-});
+  });
 
   // Gestion du placement des points
   socket.on("placeDot", ({ gameId, x, y, type }) => {
@@ -660,88 +976,91 @@ io.on("connection", (socket) => {
   });
 
   // Gestion de la mise à jour des scores
-  socket.on("updateScore", ({
-    gameId,
-    scoreRed,
-    scoreBlue,
-    dots,
-    outlines,
-    capturedEmpty,
-    timers
-}) => {
-    if (!games[gameId]) return;
+  socket.on(
+    "updateScore",
+    ({
+      gameId,
+      scoreRed,
+      scoreBlue,
+      dots,
+      outlines,
+      capturedEmpty,
+      timers,
+    }) => {
+      if (!games[gameId]) return;
 
-    // Mettre à jour les scores et l'état du jeu
-    const game = games[gameId];
-    game.gameState.scoreRed = scoreRed;
-    game.gameState.scoreBlue = scoreBlue;
+      // Mettre à jour les scores et l'état du jeu
+      const game = games[gameId];
+      game.gameState.scoreRed = scoreRed;
+      game.gameState.scoreBlue = scoreBlue;
 
-    // Mettre à jour l'état complet du jeu si fourni
-    if (dots) {
-        game.gameState.dots = dots.map(dot => ({
-            x: dot.x,
-            y: dot.y,
-            type: dot.type,
-            captured: dot.captured
+      // Mettre à jour l'état complet du jeu si fourni
+      if (dots) {
+        game.gameState.dots = dots.map((dot) => ({
+          x: dot.x,
+          y: dot.y,
+          type: dot.type,
+          captured: dot.captured,
         }));
-    }
+      }
 
-    if (outlines) {
-        game.gameState.outlines = outlines.map(outline => 
-            outline.map(point => ({
-                x: point.x,
-                y: point.y,
-                type: point.type === "red" ? "red" : "blue",
-                c: point.type === "red" ? "#ed2939" : "#4267B2"
-            }))
+      if (outlines) {
+        game.gameState.outlines = outlines.map((outline) =>
+          outline.map((point) => ({
+            x: point.x,
+            y: point.y,
+            type: point.type === "red" ? "red" : "blue",
+            c: point.type === "red" ? "#ed2939" : "#4267B2",
+          }))
         );
-    }
+      }
 
-    if (capturedEmpty) {
+      if (capturedEmpty) {
         game.gameState.capturedEmpty = capturedEmpty;
-    }
+      }
 
-    if (timers) {
+      if (timers) {
         game.gameState.timers = {
-            player1Time: timers.player1Time,
-            player2Time: timers.player2Time,
-            commonReflectionTime: timers.commonReflectionTime,
-            isReflectionPhase: timers.isReflectionPhase
+          player1Time: timers.player1Time,
+          player2Time: timers.player2Time,
+          commonReflectionTime: timers.commonReflectionTime,
+          isReflectionPhase: timers.isReflectionPhase,
         };
-    }
+      }
 
-    // Créer un état formaté pour l'émission
-    const formattedGameState = {
+      // Créer un état formaté pour l'émission
+      const formattedGameState = {
         ...game.gameState,
         dots: game.gameState.dots,
         outlines: game.gameState.outlines,
         capturedEmpty: game.gameState.capturedEmpty,
         timers: game.gameState.timers,
         scoreRed: game.gameState.scoreRed,
-        scoreBlue: game.gameState.scoreBlue
-    };
+        scoreBlue: game.gameState.scoreBlue,
+      };
 
-    // Émettre l'état complet mis à jour
-    io.to(gameId).emit("scoreUpdated", formattedGameState);
+      // Émettre l'état complet mis à jour
+      io.to(gameId).emit("scoreUpdated", formattedGameState);
 
-    // Gestion de la base de données pour les scores des joueurs
-    if (game.players.length === 2 && (scoreRed > 0 || scoreBlue > 0)) {
+      // Gestion de la base de données pour les scores des joueurs
+      if (game.players.length === 2 && (scoreRed > 0 || scoreBlue > 0)) {
         const winner = scoreRed > scoreBlue ? game.players[0] : game.players[1];
 
         if (winner) {
-            const playerSocket = io.sockets.sockets.get(winner.id);
-            if (playerSocket?.request?.session?.username) {
-                db.query(
-                    "UPDATE users SET score = score + ?, games_played = games_played + 1 WHERE username = ?",
-                    [1, playerSocket.request.session.username],
-                    (err) => {
-                        if (err) console.error("Error updating winner score:", err);
-                    }
-                );
-            }
+          const playerSocket = io.sockets.sockets.get(winner.id);
+          if (playerSocket?.request?.session?.username) {
+            db.query(
+              "UPDATE users SET score = score + ?, games_played = games_played + 1 WHERE username = ?",
+              [1, playerSocket.request.session.username],
+              (err) => {
+                if (err) console.error("Error updating winner score:", err);
+              }
+            );
+          }
         }
+      }
     }
-});
+  );
 
   // Ajouter un gestionnaire pour la mise à jour de l'état des timers
   socket.on("updateTimers", ({ gameId, timers }) => {
