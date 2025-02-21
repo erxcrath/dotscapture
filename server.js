@@ -64,7 +64,7 @@ db.connect((err) => {
   console.log("Connecté avec succès à la base de données");
 
   // Créer la table users
-const createTableQuery = `
+  const createUsersTable = `
   CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
@@ -72,7 +72,9 @@ const createTableQuery = `
     score INT DEFAULT 0,
     games_played INT DEFAULT 0
   );
+`;
 
+const createGamesHistoryTable = `
   CREATE TABLE IF NOT EXISTS games_history (
     id INT(11) NOT NULL AUTO_INCREMENT,
     game_id VARCHAR(255) NOT NULL,
@@ -84,6 +86,18 @@ const createTableQuery = `
     PRIMARY KEY (id)
   );
 `;
+
+// Exécuter les requêtes une par une
+connection.query(createUsersTable, (err) => {
+  if (err) console.error("Erreur lors de la création de la table users:", err);
+  else console.log("Table users créée avec succès.");
+  
+  connection.query(createGamesHistoryTable, (err) => {
+    if (err) console.error("Erreur lors de la création de la table games_history:", err);
+    else console.log("Table games_history créée avec succès.");
+  });
+});
+
 
 
 
