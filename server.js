@@ -75,8 +75,8 @@ db.connect((err) => {
   );
 `;
 
-const createGamesHistoryTable = `
-  CREATE TABLE IF NOT EXISTS games_history (
+const createGameHistoryTable = `
+  CREATE TABLE IF NOT EXISTS game_history (
     id INT(11) NOT NULL AUTO_INCREMENT,
     game_id VARCHAR(255) NOT NULL,
     player_username VARCHAR(255) NOT NULL,
@@ -98,8 +98,8 @@ const createGamesHistoryTable = `
 
 
 db.query(createGamesHistoryTable, (err) => {
-  if (err) console.error("Erreur lors de la création de la table games_history:", err);
-  else console.log("Table games_history créée avec succès.");
+  if (err) console.error("Erreur lors de la création de la table game_history:", err);
+  else console.log("Table game_history créée avec succès.");
 });
 });
 
