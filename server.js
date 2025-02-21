@@ -64,15 +64,28 @@ db.connect((err) => {
   console.log("Connecté avec succès à la base de données");
 
   // Créer la table users
-  const createTableQuery = `
-    CREATE TABLE IF NOT EXISTS users (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      username VARCHAR(255) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL,
-      score INT DEFAULT 0,
-      games_played INT DEFAULT 0
-    )
-  `;
+const createTableQuery = `
+  CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    score INT DEFAULT 0,
+    games_played INT DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS games_history (
+    id INT(11) NOT NULL AUTO_INCREMENT,
+    game_id VARCHAR(255) NOT NULL,
+    player_username VARCHAR(255) NOT NULL,
+    opponent_username VARCHAR(255) NOT NULL,
+    result FLOAT NOT NULL,
+    end_reason VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+  );
+`;
+
+
 
   db.query(createTableQuery, (err) => {
     if (err) {
