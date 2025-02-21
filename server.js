@@ -8,18 +8,24 @@ const MySQLStore = require("express-mysql-session")(session);
 const bcrypt = require("bcryptjs");
 const bodyParser = require("body-parser"); // Ajout de cette ligne
 
-// Configuration de la base de données
 const dbConfig = {
-  host: "kil9uzd3tgem3naa.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
-  user: "vq59kak6l2fnh7wb",
-  password: "fro27g39ovtnax2m",
-  database: "hv3q4ftkopxrnj0n",
-  port: 3306,
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 3306
 };
 
+
+//const dbConfig = {
+  //host: "localhost",
+  //user: "root",
+  //password: "",
+  //database: "faritanyX",
+  //port: 3306,
+//};
 // Créer la connexion à la base de données
 const db = mysql.createConnection(dbConfig);
-
 // Créer le store de session
 const sessionStore = new MySQLStore(dbConfig);
 
@@ -228,8 +234,9 @@ app.post("/register", (req, res) => {
   if (username && password) {
     bcrypt.hash(password, 8, (err, hash) => {
       if (err) throw err;
+      // Modifier la requête pour inclure le score initial de 1200
       db.query(
-        "INSERT INTO users (username, password) VALUES (?, ?)",
+        "INSERT INTO users (username, password, score, games_played) VALUES (?, ?, 1200, 0)",
         [username, hash],
         (err) => {
           if (err) {
@@ -395,6 +402,7 @@ io.on("connection", (socket) => {
   });
 
   // Dans server.js, remplacer le gestionnaire d'abandon existant
+// Dans server.js, modifions le gestionnaire d'abandon
 socket.on('abandonGame', async ({ gameId, player }) => {
   const game = games[gameId];
   if (!game) return;
@@ -410,61 +418,85 @@ socket.on('abandonGame', async ({ gameId, player }) => {
           queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
       ]);
 
-      const player1Elo = player1Data[0]?.score || 1500;
-      const player2Elo = player2Data[0]?.score || 1500;
+      const player1Elo = player1Data[0]?.score || 1200;
+      const player2Elo = player2Data[0]?.score || 1200;
 
-      // En cas d'abandon, le gagnant reçoit un score de 1 et le perdant 0
       const player1Score = winner === 'player1' ? 1 : 0;
       const player2Score = 1 - player1Score;
 
-      // Calculer les nouveaux scores ELO
       const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, player1Score);
       const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, player2Score);
 
-      // Mettre à jour les scores dans la base de données
-      await Promise.all([
-          queryAsync(
-              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ?',
-              [newPlayer1Elo, player1.username]
-          ),
-          queryAsync(
-              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ?',
-              [newPlayer2Elo, player2.username]
-          )
-      ]);
+      // Démarrer une transaction
+      await queryAsync('START TRANSACTION');
 
-      // Envoyer les résultats détaillés
-      io.to(gameId).emit('gameEnded', {
-          reason: 'abandon',
-          winner: winner,
-          message: `${player === 'player1' ? 'Joueur 1' : 'Joueur 2'} a abandonné la partie`,
-          finalScores: {
-              player1: {
-                  username: player1.username,
-                  oldElo: player1Elo,
-                  newElo: newPlayer1Elo,
-                  scoreDiff: newPlayer1Elo - player1Elo
-              },
-              player2: {
-                  username: player2.username,
-                  oldElo: player2Elo,
-                  newElo: newPlayer2Elo,
-                  scoreDiff: newPlayer2Elo - player2Elo
+      try {
+          // Insérer dans l'historique
+          await queryAsync(
+              'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+              [gameId, player1.username, player2.username, player1Score, 'abandon']
+          );
+
+          // Mettre à jour les scores
+          await Promise.all([
+              queryAsync(
+                  'UPDATE users SET score = ? WHERE username = ?',
+                  [newPlayer1Elo, player1.username]
+              ),
+              queryAsync(
+                  'UPDATE users SET score = ? WHERE username = ?',
+                  [newPlayer2Elo, player2.username]
+              )
+          ]);
+
+          // Mettre à jour games_played en se basant sur game_history
+          await queryAsync(`
+              UPDATE users u 
+              SET games_played = (
+                  SELECT COUNT(*) 
+                  FROM game_history 
+                  WHERE player_username = u.username
+                  OR opponent_username = u.username
+              )
+              WHERE username IN (?, ?)
+          `, [player1.username, player2.username]);
+
+          await queryAsync('COMMIT');
+
+          // Envoyer les résultats
+          io.to(gameId).emit('gameEnded', {
+              reason: 'abandon',
+              winner: winner,
+              message: `${player === 'player1' ? 'Joueur 1' : 'Joueur 2'} a abandonné la partie`,
+              finalScores: {
+                  player1: {
+                      username: player1.username,
+                      oldElo: player1Elo,
+                      newElo: newPlayer1Elo,
+                      scoreDiff: newPlayer1Elo - player1Elo
+                  },
+                  player2: {
+                      username: player2.username,
+                      oldElo: player2Elo,
+                      newElo: newPlayer2Elo,
+                      scoreDiff: newPlayer2Elo - player2Elo
+                  }
               }
-          }
-      });
+          });
 
-      // Nettoyer la partie
-      delete games[gameId];
+          // Nettoyer la partie
+          delete games[gameId];
+
+      } catch (dbError) {
+          await queryAsync('ROLLBACK');
+          throw dbError;
+      }
 
   } catch (error) {
       console.error('Erreur lors de la gestion de l\'abandon:', error);
-      io.to(gameId).emit('gameError', {
-          message: 'Une erreur est survenue lors de la finalisation de la partie'
-      });
   }
 });
-
+// Gestionnaire pour le timeout
 socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
   const game = games[gameId];
   if (!game) return;
@@ -473,199 +505,241 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
       const player1 = game.players.find(p => p.type === 'player1');
       const player2 = game.players.find(p => p.type === 'player2');
 
-      // Récupérer les scores ELO actuels
       const [player1Data, player2Data] = await Promise.all([
           queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
           queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
       ]);
 
-      const player1Elo = player1Data[0]?.score || 1500;
-      const player2Elo = player2Data[0]?.score || 1500;
+      const player1Elo = player1Data[0]?.score || 1200;
+      const player2Elo = player2Data[0]?.score || 1200;
 
-      // En cas de timeout, le perdant reçoit un score de 0 et le gagnant 1
       const player1Score = winner === 'player1' ? 1 : 0;
       const player2Score = 1 - player1Score;
 
-      // Calculer les nouveaux scores ELO
       const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, player1Score);
       const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, player2Score);
 
-      // Mettre à jour les scores dans la base de données
-      await Promise.all([
-          queryAsync(
-              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ?',
-              [newPlayer1Elo, player1.username]
-          ),
-          queryAsync(
-              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ?',
-              [newPlayer2Elo, player2.username]
-          )
-      ]);
+      // Démarrer une transaction
+      await queryAsync('START TRANSACTION');
 
-      const loserName = loser === 'player1' ? player1.username : player2.username;
+      try {
+          // Insérer dans l'historique
+          await queryAsync(
+              'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+              [gameId, player1.username, player2.username, player1Score, 'timeout']
+          );
 
-      // Envoyer les résultats détaillés aux deux joueurs
-      io.to(gameId).emit('gameEnded', {
-          reason: 'timeout',
-          winner: winner,
-          message: `Partie terminée : Temps écoulé pour ${loserName}`,
-          finalScores: {
-              player1: {
-                  username: player1.username,
-                  oldElo: player1Elo,
-                  newElo: newPlayer1Elo,
-                  scoreDiff: newPlayer1Elo - player1Elo
-              },
-              player2: {
-                  username: player2.username,
-                  oldElo: player2Elo,
-                  newElo: newPlayer2Elo,
-                  scoreDiff: newPlayer2Elo - player2Elo
+          // Mettre à jour les scores
+          await Promise.all([
+              queryAsync(
+                  'UPDATE users SET score = ? WHERE username = ?',
+                  [newPlayer1Elo, player1.username]
+              ),
+              queryAsync(
+                  'UPDATE users SET score = ? WHERE username = ?',
+                  [newPlayer2Elo, player2.username]
+              )
+          ]);
+
+          // Mettre à jour games_played en se basant sur game_history
+          await queryAsync(`
+              UPDATE users u 
+              SET games_played = (
+                  SELECT COUNT(*) 
+                  FROM game_history 
+                  WHERE player_username = u.username
+                  OR opponent_username = u.username
+              )
+              WHERE username IN (?, ?)
+          `, [player1.username, player2.username]);
+
+          await queryAsync('COMMIT');
+
+          io.to(gameId).emit('gameEnded', {
+              reason: 'timeout',
+              winner: winner,
+              message: `Partie terminée par timeout`,
+              finalScores: {
+                  player1: {
+                      username: player1.username,
+                      oldElo: player1Elo,
+                      newElo: newPlayer1Elo,
+                      scoreDiff: newPlayer1Elo - player1Elo
+                  },
+                  player2: {
+                      username: player2.username,
+                      oldElo: player2Elo,
+                      newElo: newPlayer2Elo,
+                      scoreDiff: newPlayer2Elo - player2Elo
+                  }
               }
-          }
-      });
+          });
 
-      // Nettoyer la partie
-      delete games[gameId];
+          delete games[gameId];
+
+      } catch (dbError) {
+          await queryAsync('ROLLBACK');
+          throw dbError;
+      }
 
   } catch (error) {
       console.error('Erreur lors de la gestion du timeout:', error);
-      io.to(gameId).emit('gameError', {
-          message: 'Une erreur est survenue lors de la finalisation de la partie'
-      });
   }
 });
-
   // Gestion de la mise à terre
+  // Modification de l'événement miseATerre pour éviter le double comptage
   socket.on("miseATerre", async ({ gameId }) => {
     if (!games[gameId]) return;
-
+  
     const game = games[gameId];
-    // Ajouter un flag pour indiquer que la partie est en mode mise à terre
-    game.isMiseATerre = true;
+    // Vérifier si la partie est déjà terminée
+    if (game.gameEnded) return;
+    
+    // Marquer immédiatement la partie comme terminée pour éviter les doublons
+    game.gameEnded = true;
     
     const currentPlayer = game.players.find((p) => p.id === socket.id);
-
-    if (!currentPlayer || currentPlayer.type !== game.gameState.currentTurn)
+    if (!currentPlayer || currentPlayer.type !== game.gameState.currentTurn) {
+        game.gameEnded = false; // Réinitialiser si le joueur n'est pas valide
         return;
-
-    const playerDots = game.gameState.dots.filter(
-        (dot) => dot.type === currentPlayer.type
-    );
-    const opponentType = currentPlayer.type === "player1" ? "player2" : "player1";
-
-    // Pour chaque point du joueur, vérifier les cases adjacentes vides
-    const newDots = [];
-    const existingPositions = new Set(
-        game.gameState.dots.map((dot) => `${dot.x},${dot.y}`)
-    );
-
-    playerDots.forEach((dot) => {
-        [
-            [-1, -1], [-1, 0], [-1, 1],
-            [0, -1], [0, 1],
-            [1, -1], [1, 0], [1, 1]
-        ].forEach(([dx, dy]) => {
-            const newX = dot.x + dx;
-            const newY = dot.y + dy;
-
-            if (
-                newX >= 0 &&
-                newX < 39 &&
-                newY >= 0 &&
-                newY < 32 &&
-                !existingPositions.has(`${newX},${newY}`)
-            ) {
-                newDots.push({ x: newX, y: newY, type: opponentType });
-                existingPositions.add(`${newX},${newY}`);
-            }
-        });
-    });
-
-    // Ajouter tous les nouveaux points d'un coup
-    game.gameState.dots.push(...newDots);
-    
-    // Notifier tous les nouveaux points
-    for (const newDot of newDots) {
-        io.to(gameId).emit("dotPlaced", newDot);
     }
-
-    // Attendre un court instant pour que les captures soient calculées
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Gérer la fin de partie et le calcul ELO
+  
     try {
+        // Première étape : placer tous les nouveaux points
+        const playerDots = game.gameState.dots.filter(dot => dot.type === currentPlayer.type);
+        const opponentType = currentPlayer.type === "player1" ? "player2" : "player1";
+        const newDots = [];
+        const existingPositions = new Set(game.gameState.dots.map(dot => `${dot.x},${dot.y}`));
+  
+        playerDots.forEach((dot) => {
+            [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]].forEach(([dx, dy]) => {
+                const newX = dot.x + dx;
+                const newY = dot.y + dy;
+  
+                if (newX >= 0 && newX < 39 && newY >= 0 && newY < 32 && !existingPositions.has(`${newX},${newY}`)) {
+                    newDots.push({ x: newX, y: newY, type: opponentType });
+                    existingPositions.add(`${newX},${newY}`);
+                }
+            });
+        });
+  
+        // Ajouter les points à l'état du jeu
+        game.gameState.dots.push(...newDots);
+  
+        // Notifier les points
+        for (const newDot of newDots) {
+            io.to(gameId).emit("dotPlaced", newDot);
+        }
+  
+        // Attendre pour les calculs
+        await new Promise(resolve => setTimeout(resolve, 100));
+  
+        // Deuxième étape : traiter les scores et la fin de partie
         const player1 = game.players.find(p => p.type === 'player1');
         const player2 = game.players.find(p => p.type === 'player2');
-
+  
+        // Récupérer les scores ELO actuels
         const [player1Data, player2Data] = await Promise.all([
             queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
             queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
         ]);
-
-        const player1Elo = player1Data[0]?.score || 1500;
-        const player2Elo = player2Data[0]?.score || 1500;
-
-        // Déterminer le gagnant basé sur le score final
+  
+        const player1Elo = player1Data[0]?.score || 1200;
+        const player2Elo = player2Data[0]?.score || 1200;
+  
+        // Déterminer le gagnant
         const player1Score = game.gameState.scoreRed > game.gameState.scoreBlue ? 1 : 0;
         const player2Score = 1 - player1Score;
-
+  
         // Calculer les nouveaux scores ELO
         const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, player1Score);
         const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, player2Score);
-
-        // Une seule mise à jour par joueur pour la partie entière
-        await Promise.all([
-            queryAsync(
-                'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ? AND NOT EXISTS (SELECT 1 FROM game_history WHERE game_id = ? AND player_username = ?)',
-                [newPlayer1Elo, player1.username, gameId, player1.username]
-            ),
-            queryAsync(
-                'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ? AND NOT EXISTS (SELECT 1 FROM game_history WHERE game_id = ? AND player_username = ?)',
-                [newPlayer2Elo, player2.username, gameId, player2.username]
-            )
-        ]);
-
-        // Enregistrer l'historique de la partie une seule fois
-        if (!game.historyRecorded) {
-            await queryAsync(
-                'INSERT IGNORE INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
-                [gameId, player1.username, player2.username, player1Score, 'miseATerre']
+  
+        // Transaction unique pour l'enregistrement
+        await queryAsync('START TRANSACTION');
+  
+        try {
+            // Vérifier si la partie est déjà enregistrée
+            const historyExists = await queryAsync(
+                'SELECT 1 FROM game_history WHERE game_id = ? LIMIT 1',
+                [gameId]
             );
-            game.historyRecorded = true;
-        }
-
-        // Envoyer le résultat final
-        io.to(gameId).emit('gameEnded', {
-            reason: 'miseATerre',
-            winner: player1Score > player2Score ? 'player1' : 'player2',
-            message: 'Partie terminée par mise à terre',
-            finalScores: {
-                player1: {
-                    username: player1.username,
-                    oldElo: player1Elo,
-                    newElo: newPlayer1Elo,
-                    scoreDiff: newPlayer1Elo - player1Elo
-                },
-                player2: {
-                    username: player2.username,
-                    oldElo: player2Elo,
-                    newElo: newPlayer2Elo,
-                    scoreDiff: newPlayer2Elo - player2Elo
+  
+            if (!historyExists.length) {
+              await Promise.all([
+                  // Mise à jour des scores uniquement
+                  queryAsync(
+                      'UPDATE users SET score = ? WHERE username = ?',
+                      [newPlayer1Elo, player1.username]
+                  ),
+                  queryAsync(
+                      'UPDATE users SET score = ? WHERE username = ?',
+                      [newPlayer2Elo, player2.username]
+                  ),
+                  // Enregistrer dans l'historique
+                  queryAsync(
+                      'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+                      [gameId, player1.username, player2.username, player1Score, 'miseATerre']
+                  )
+              ]);
+          
+              // Mettre à jour games_played APRÈS en se basant sur game_history
+              await queryAsync(`
+                  UPDATE users u 
+                  SET games_played = (
+                      SELECT COUNT(*) 
+                      FROM game_history 
+                      WHERE player_username = u.username
+                      OR opponent_username = u.username
+                  )
+                  WHERE username IN (?, ?)
+              `, [player1.username, player2.username]);
+          
+              await queryAsync('COMMIT');
+          
+          } else {
+              await queryAsync('ROLLBACK');
+          }
+  
+            // Envoyer le résultat final
+            io.to(gameId).emit('gameEnded', {
+                reason: 'miseATerre',
+                winner: player1Score > player2Score ? 'player1' : 'player2',
+                message: 'Partie terminée par mise à terre',
+                finalScores: {
+                    player1: {
+                        username: player1.username,
+                        oldElo: player1Elo,
+                        newElo: newPlayer1Elo,
+                        scoreDiff: newPlayer1Elo - player1Elo
+                    },
+                    player2: {
+                        username: player2.username,
+                        oldElo: player2Elo,
+                        newElo: newPlayer2Elo,
+                        scoreDiff: newPlayer2Elo - player2Elo
+                    }
                 }
-            }
-        });
-
-        // Nettoyer la partie
-        delete games[gameId];
-
+            });
+  
+            // Nettoyer la partie
+            delete games[gameId];
+  
+        } catch (dbError) {
+            await queryAsync('ROLLBACK');
+            throw dbError;
+        }
+  
     } catch (error) {
-        console.error('Erreur lors de la finalisation de la partie:', error);
+        console.error('Erreur lors de la mise à terre:', error);
+        game.gameEnded = false;
         io.to(gameId).emit('gameError', {
-            message: 'Une erreur est survenue lors de la finalisation de la partie'
+            message: 'Une erreur est survenue lors de la mise à terre'
         });
     }
-});
+  });
+  
+  
   socket.on('gameOver', async ({ gameId, winner, reason }) => {
     await handleGameEnd(gameId, winner, reason);
     
@@ -677,7 +751,7 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
   });
 
   // Fonction de gestion de fin de partie
-// Dans server.js - Modifier la fonction handleGameEnd
+// Modifier la fonction handleGameEnd
 async function handleGameEnd(gameId, winner, reason) {
   const game = games[gameId];
   if (!game || game.gameEnded) return; // Empêcher le double comptage
@@ -688,15 +762,15 @@ async function handleGameEnd(gameId, winner, reason) {
       
       const player1 = game.players.find(p => p.type === 'player1');
       const player2 = game.players.find(p => p.type === 'player2');
-
+ 
       const [player1Data, player2Data] = await Promise.all([
           queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
           queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
       ]);
-
-      const player1Elo = player1Data[0]?.score || 1500;
-      const player2Elo = player2Data[0]?.score || 1500;
-
+ 
+      const player1Elo = player1Data[0]?.score || 1200;
+      const player2Elo = player2Data[0]?.score || 1200;
+ 
       // Déterminer les scores selon la raison
       let p1Score, p2Score;
       switch (reason) {
@@ -705,6 +779,9 @@ async function handleGameEnd(gameId, winner, reason) {
               p2Score = 1 - p1Score;
               break;
           case 'abandon':
+              p1Score = winner === 'player1' ? 1 : 0;
+              p2Score = 1 - p1Score;
+              break;
           case 'timeout':
               p1Score = winner === 'player1' ? 1 : 0;
               p2Score = 1 - p1Score;
@@ -713,51 +790,106 @@ async function handleGameEnd(gameId, winner, reason) {
               p1Score = 0.5;
               p2Score = 0.5;
       }
-
+ 
       const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, p1Score);
       const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, p2Score);
-
-      // Mettre à jour les scores ELO mais incrémenter games_played une seule fois
-      await Promise.all([
-          queryAsync(
-              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ? AND NOT EXISTS (SELECT 1 FROM game_history WHERE game_id = ? AND player_username = ?)',
-              [newPlayer1Elo, player1.username, gameId, player1.username]
-          ),
-          queryAsync(
-              'UPDATE users SET score = ?, games_played = games_played + 1 WHERE username = ? AND NOT EXISTS (SELECT 1 FROM game_history WHERE game_id = ? AND player_username = ?)',
-              [newPlayer2Elo, player2.username, gameId, player2.username]
-          )
-      ]);
-
-      // Enregistrer l'historique de la partie
-      await queryAsync(
-          'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
-          [gameId, player1.username, player2.username, p1Score, reason]
-      );
-
-      // Nettoyer la partie
-      delete games[gameId];
-      
-      return {
-          player1: { oldElo: player1Elo, newElo: newPlayer1Elo },
-          player2: { oldElo: player2Elo, newElo: newPlayer2Elo }
-      };
+ 
+      await queryAsync('START TRANSACTION');
+ 
+      try {
+          // Mettre à jour les scores et enregistrer l'historique
+          await Promise.all([
+              // Mise à jour des scores uniquement
+              queryAsync(
+                  'UPDATE users SET score = ? WHERE username = ?',
+                  [newPlayer1Elo, player1.username]
+              ),
+              queryAsync(
+                  'UPDATE users SET score = ? WHERE username = ?',
+                  [newPlayer2Elo, player2.username]
+              ),
+              // Enregistrer dans l'historique
+              queryAsync(
+                  'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+                  [gameId, player1.username, player2.username, p1Score, reason]
+              )
+          ]);
+ 
+          // Mettre à jour games_played en comptant à la fois comme joueur et comme adversaire
+          await queryAsync(`
+              UPDATE users u 
+              SET games_played = (
+                  SELECT COUNT(*) 
+                  FROM game_history 
+                  WHERE player_username = u.username 
+                  OR opponent_username = u.username
+              )
+              WHERE username IN (?, ?)
+          `, [player1.username, player2.username]);
+ 
+          await queryAsync('COMMIT');
+ 
+          // Nettoyer la partie
+          delete games[gameId];
+          
+          return {
+              player1: { oldElo: player1Elo, newElo: newPlayer1Elo },
+              player2: { oldElo: player2Elo, newElo: newPlayer2Elo }
+          };
+ 
+      } catch (dbError) {
+          await queryAsync('ROLLBACK');
+          throw dbError;
+      }
+ 
   } catch (error) {
       console.error('Erreur lors de la fin de partie:', error);
       throw error;
   }
-}
-
-// Fonction utilitaire pour les promesses MySQL
-function queryAsync(sql, values) {
-  return new Promise((resolve, reject) => {
-    db.query(sql, values, (err, results) => {
-      if (err) reject(err);
-      else resolve(results);
-    });
+ }
+// Fonction pour gérer la reconnexion
+function handleDisconnect() {
+  db.on('error', function(err) {
+      console.log('db error', err);
+      if(err.code === 'PROTOCOL_CONNECTION_LOST') {
+          handleDisconnect();
+      } else {
+          throw err;
+      }
   });
 }
 
+handleDisconnect();
+
+// Fonction pour vérifier/rétablir la connexion avant chaque requête
+function ensureConnection() {
+  return new Promise((resolve, reject) => {
+      if (db.state === 'disconnected') {
+          db.connect(function(err) {
+              if (err) {
+                  reject(err);
+              } else {
+                  resolve();
+              }
+          });
+      } else {
+          resolve();
+      }
+  });
+}
+
+// Modifier la fonction queryAsync
+function queryAsync(sql, values) {
+  return ensureConnection()
+      .then(() => {
+          return new Promise((resolve, reject) => {
+              db.query(sql, values, (err, results) => {
+                  if (err) reject(err);
+                  else resolve(results);
+              });
+          });
+      });
+}
 
   // Gestion des demandes de match
   socket.on("requestMatch", (data) => {
@@ -1043,22 +1175,23 @@ function queryAsync(sql, values) {
       io.to(gameId).emit("scoreUpdated", formattedGameState);
 
       // Gestion de la base de données pour les scores des joueurs
-      if (game.players.length === 2 && (scoreRed > 0 || scoreBlue > 0)) {
-        const winner = scoreRed > scoreBlue ? game.players[0] : game.players[1];
-
-        if (winner) {
-          const playerSocket = io.sockets.sockets.get(winner.id);
-          if (playerSocket?.request?.session?.username) {
-            db.query(
-              "UPDATE users SET score = score + ?, games_played = games_played + 1 WHERE username = ?",
+      // Remplacer cette partie dans "updateScore"
+if (game.players.length === 2 && (scoreRed > 0 || scoreBlue > 0)) {
+  const winner = scoreRed > scoreBlue ? game.players[0] : game.players[1];
+  if (winner) {
+      const playerSocket = io.sockets.sockets.get(winner.id);
+      if (playerSocket?.request?.session?.username) {
+          // Uniquement mettre à jour le score, pas games_played
+          db.query(
+              "UPDATE users SET score = score + ? WHERE username = ?",
               [1, playerSocket.request.session.username],
               (err) => {
-                if (err) console.error("Error updating winner score:", err);
+                  if (err) console.error("Error updating winner score:", err);
               }
-            );
-          }
-        }
+          );
       }
+  }
+}
     }
   );
 

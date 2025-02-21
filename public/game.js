@@ -1,11 +1,14 @@
 // Variables globales
+// Au début du fichier game.js, après la déclaration des variables
+let player1HasPlayed = false;
+let player2HasPlayed = false;
 const MAX_X = 39;
 const MAX_Y = 32;
-const Scale = Math.min((window.innerWidth - 100) / MAX_X, (window.innerHeight - 300) / MAX_Y);
-const WIDTH = Scale * (MAX_X - 1);
-const HEIGHT = Scale * (MAX_Y - 1);
-const DOTSIZE = Scale / 1.8;
-const LINEWEIGHT = DOTSIZE / 8;
+let Scale = Math.min((window.innerWidth-20) / MAX_X, (window.innerHeight) / MAX_Y);
+let WIDTH = Scale * (MAX_X - 1);
+let HEIGHT = Scale * (MAX_Y - 1);
+let DOTSIZE = Scale / 1.8;
+let LINEWEIGHT = DOTSIZE / 8;
 
 // Définition des zones de départ
 const STARTING_ZONE_SIZE = 5.0000000009;
@@ -235,7 +238,7 @@ function updateTimerDisplay() {
 
     // Afficher le timer de réflexion commun
     document.getElementById('commonReflectionTimer').innerHTML = 
-        isReflectionPhase ? `Temps de réflexion: ${commonReflectionTime}s` : '';
+        isReflectionPhase ? `Temps de réflexion: ${commonReflectionTime}s` : 'Temps de réflexion: 0s';
 
     // Afficher les timers principaux
     document.getElementById('player1MainTimer').textContent = formatTime(player1Time);
@@ -716,6 +719,9 @@ socket.on('gameJoined', (data) => {
     }
 });
 socket.on('gameStart', (gameState) => {
+    player1HasPlayed = false;
+    player2HasPlayed = false;
+    document.getElementById('miseATerreBtn').disabled = true;
     if (gameState.player1Name) {
         document.getElementById('player1Name').textContent = gameState.player1Name;
     }
@@ -729,12 +735,17 @@ socket.on('dotPlaced', (data) => {
     let newDot = new Dot(data.type === 'player1' ? 1 : 2, data.x, data.y);
     if (data.type === 'player1') {
         reddots[data.x][data.y] = newDot;
+        player1HasPlayed = true;
     } else {
         bluedots[data.x][data.y] = newDot;
+        player2HasPlayed = true;
     }
     render.push(newDot);
-    lastPlacedDot = newDot; // Mettre à jour le dernier point placé
+    lastPlacedDot = newDot;
     applyPathfinding(newDot);
+
+    // Activer le bouton mise à terre seulement si les deux joueurs ont joué
+    document.getElementById('miseATerreBtn').disabled = !(player1HasPlayed && player2HasPlayed);
 });
 
 socket.on('turnChange', (newTurn) => {

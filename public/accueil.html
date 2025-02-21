@@ -1,390 +1,473 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accueil - Jeu de Points</title>
+    <title>Jeu de Points</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
+        .button-icon {
+            margin-right: 8px;
+            font-size: 18px;
         }
-
+    
+        .game-button, .game-button-deconnexion {
+            gap: 8px;  /* Espace entre l'icône et le texte */
+        }
+        
+        .player-count {
+            background-color: #4caf50;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-size: 14px;
+        }
+    
         body {
             margin: 0;
             padding: 0;
             font-family: Arial, sans-serif;
-            background-color: #f0f2f5;
+            background-color: rgb(0, 0, 0);
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-
-        .navbar {
+    
+        .game-container {
+            width: 90%;
+            max-width: 400px;
+            margin:  auto;
+            padding: 20px;
+            background-color: rgb(0, 0, 0);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+    
+        .game-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+    
+        .game-logo img:first-child {
+            order: -1;
+        }
+    
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+    
+        .game-input {
+            grid-column: 1 / -1;
+        }
+    
+        .full-width {
+            grid-column: 1 / -1;
+        }
+    
+        .game-title {
+            font-size: 24px;
+            color: #2c3e50;
+            text-align: center;
+            margin: 10px 0 30px 0;
+        }
+    
+        .game-button {
+            width: 100%;
+            padding: 15px;
+            margin: 0;
+            border: none;
+            border-radius: 10px;
+            background-color: #f3fcfb;
+            color: #109c5b;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+    
+        .game-button-deconnexion {
+            width: 100%;
+            padding: 15px;
+            margin: 0;
+            border: none;
+            border-radius: 10px;
+            background-color: #fcf3f3;
+            color: #741a1a;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+    
+        .game-button:hover {
+            background-color: #4fb18b;
+            transform: translateY(-2px);
+            color: black;
+        }
+    
+        .game-button-deconnexion:hover {
+            background-color: #b14f4f;
+            transform: translateY(-2px);
+            color: black;
+        }
+    
+        .game-button.primary {
+            background-color: #4fb18b;
+            color: white;
+        }
+    
+        .game-button.primary:hover {
+            background-color: #1f9232;
+        }
+    
+        .game-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e8f0fe;
+            border-radius: 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+    
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 400px;
             background-color: white;
-            padding: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
         }
-
-        .navbar-content {
+    
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    
+        .close-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+    
+        .player-list {
+            margin-top: 15px;
+        }
+    
+        .player-card {
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+    
+        .player-card:hover {
+            background-color: #e8f0fe;
+            transform: translateY(-2px);
+        }
+    
+        .player-info {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            max-width: 1200px;
-            margin: 0 auto;
-            flex-wrap: wrap;
-            gap: 10px;
         }
-
-        .title {
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        input {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+    
+        .status-in-game {
+            color: #f44336;
             font-size: 14px;
-            width: 100%;
-            max-width: 200px;
         }
-
-        button, .btn-disconnect {
-            min-width: 90px;
-            padding: 8px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
+    
+        .status-available {
+            color: #4caf50;
             font-size: 14px;
-            text-align: center;
-            text-decoration: none;
         }
-
-        .btn-join {
-            background-color: #4285f4;
-            color: white;
-        }
-
-        .btn-create {
-            background-color: #34a853;
-            color: white;
-        }
-
-        .btn-disconnect {
-            background-color: #ea4335;
-            color: white;
-            display: inline-block;
-        }
-
-        .content {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 20px;
-            padding: 15px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .card {
+    
+        .notification {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             background: white;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1100;
+            width: 90%;
+            max-width: 400px;
         }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #202124;
-        }
-
-        .player-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 15px;
-    margin-bottom: 8px;
-    background: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.player-card:hover {
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    transform: translateY(-1px);
-}
-
-.player-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.status-in-game {
-    color: #ea4335;
-    font-size: 0.9em;
-}
-
-.status-available {
-    color: #34a853;
-    font-size: 0.9em;
-}
-
-.loading-text {
-    text-align: center;
-    color: #666;
-    padding: 20px;
-}
-        .player-card:active {
-            background-color: #f1f3f4;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-
-        th {
-            text-align: left;
-            padding: 8px;
-            color: #5f6368;
-            font-size: 12px;
-            text-transform: uppercase;
-            border-bottom: 1px solid #e8eaed;
-        }
-
-        td {
-            padding: 8px;
-            border-bottom: 1px solid #e8eaed;
-        }
-
-        .modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.4);
-}
-
-.modal-content {
-    background-color: #fefefe;
-    margin: 15% auto;
-    padding: 20px;
-    border: 1px solid #888;
-    width: 80%;
-    max-width: 500px;
-    border-radius: 8px;
-    position: relative;
-}
-
-.close-modal {
-    position: absolute;
-    right: 10px;
-    top: 5px;
-    font-size: 24px;
-    cursor: pointer;
-}
-
-.request-game {
-    width: 100%;
-    padding: 10px;
-    margin-top: 15px;
-    background-color: #4285f4;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.notification {
-    display: none;
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: white;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    z-index: 1000;
-}
-
+    
         .notification-buttons {
             display: flex;
             gap: 10px;
-            justify-content: center;
-            margin-top: 10px;
-        }
-
-        .accept-btn, .decline-btn {
-            flex: 1;
-            max-width: 120px;
-            padding: 8px;
-        }
-
-        .accept-btn {
-            background-color: #34a853;
-            color: white;
-        }
-
-        .decline-btn {
-            background-color: #ea4335;
-            color: white;
-        }
-
-        .request-game {
-            background-color: #4285f4;
-            color: white;
-            width: 100%;
             margin-top: 15px;
-            padding: 10px;
         }
-
-        @media (min-width: 768px) {
-            .content {
-                grid-template-columns: repeat(2, 1fr);
-                padding: 20px;
-            }
-
-            .navbar {
-                padding: 15px 20px;
-            }
-
-            .notification {
-                top: 20px;
-                bottom: auto;
-                right: 20px;
-                left: auto;
-                transform: none;
-                width: auto;
-            }
-
-            .modal-content {
-                margin: 15% auto;
-                padding: 25px;
-            }
-
-            button, .btn-disconnect {
-                min-width: 100px;
-            }
+    
+        .notification-buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
-
-        @media (max-width: 480px) {
-            .controls {
-                flex-direction: column;
-                width: 100%;
-            }
-
-            input, button, .btn-disconnect {
-                width: 100%;
-                max-width: none;
-            }
-
-            .navbar-content {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .title {
-                text-align: center;
-                margin-bottom: 10px;
-            }
-
-            th, td {
-                padding: 6px;
-                font-size: 13px;
-            }
+    
+        .accept-btn {
+            background-color: #4a90e2;
+            color: white;
         }
+    
+        .decline-btn {
+            background-color: #e8f0fe;
+            color: #4a90e2;
+        }
+    
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+            border-radius: 10px;
+            background: white;
+        }
+    
+        .game-image {
+            width: 100%;
+            height: auto;
+        }
+    
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+        }
+    
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 14px;
+            padding: 16px;
+            border-bottom: 2px solid #e8f0fe;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+    
+        td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f4f8;
+            color: #4a5568;
+            font-size: 15px;
+        }
+    
+        tbody tr {
+            transition: all 0.2s ease;
+        }
+    
+        tbody tr:hover {
+            background-color: #f8fafc;
+            transform: translateY(-1px);
+        }
+    
+        .rank-icon {
+            font-size: 20px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+    
+        td:first-child {
+            font-size: 0;
+        }
+    
+        td:first-child .rank-icon {
+            font-size: 20px;
+        }
+    
+        td:first-child .rank-number {
+            font-size: 15px;
+            color: #4a90e2;
+            font-weight: 600;
+        }
+    
+        td:nth-child(2) {
+            font-weight: 500;
+        }
+    
+        td:nth-child(3) {
+            font-weight: 600;
+            color: #2c5282;
+        }
+    
+        td:nth-child(4) {
+            color: #718096;
+        }
+    
+        tbody tr:nth-child(1) td:first-child {
+            color: #ffd700;
+            font-weight: 700;
+        }
+    
+        tbody tr:nth-child(2) td:first-child {
+            color: #c0c0c0;
+            font-weight: 700;
+        }
+    
+        tbody tr:nth-child(3) td:first-child {
+            color: #cd7f32;
+            font-weight: 700;
+        }
+    
+        .loading-text {
+            text-align: center;
+            color: #718096;
+            padding: 30px;
+            font-style: italic;
+        }
+    
+        @media (max-width: 320px) {
+    .buttons-grid {
+        grid-template-columns: 1fr 1fr; /* Deux colonnes même sur petits écrans */
+        gap: 5px;  /* Moins d'espace entre les boutons */
+    }
+
+    .game-title {
+        font-size: 18px;
+        margin-bottom: 20px;
+    }
+
+    .game-button, .game-button-deconnexion {
+        padding: 12px;
+        font-size: 14px;
+    }
+
+    .game-input {
+        padding: 12px;
+        font-size: 14px;
+    }
+}
+
     </style>
+    
+    
 </head>
+
 <body>
-    <nav class="navbar">
-        <div class="navbar-content">
-            <div class="title">Jeu de Points</div>
-            <div class="controls">
-                <input type="text" id="gameId" placeholder="ID de la partie">
-                <button onclick="joinGame()" class="btn-join">Rejoindre</button>
-                <button onclick="createGame()" class="btn-create">Créer</button>
-                <a href="/logout" class="btn-disconnect">Déconnexion</a>
-            </div>
-        </div>
-    </nav>
-
-    <div class="content">
-        <div class="card">
-            <h2 class="card-title">Joueurs en ligne (0)</h2>
-            <div id="online-players">
-                <div class="loading-text">Chargement des joueurs...</div>
-            </div>
+    <div class="game-container">
+        <div class="game-logo">
+            <img src="dotscapture.jpg" alt="Dots Capture Logo" class="game-image">
+            <img src="dotscapture2.jpg" alt="Dots Capture Logo" class="game-image">
         </div>
 
-        <div class="card">
-            <h2 class="card-title">Classement</h2>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>JOUEUR</th>
-                            <th>SCORE</th>
-                            <th>PARTIES</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboard">
-                        <tr>
-                            <td colspan="4" class="loading-text">Chargement du classement...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+        <div class="buttons-grid">
+            <input type="text" class="game-input" id="gameId" placeholder="🎮 ID de la partie">
+            <button onclick="joinGame()" class="game-button primary full-width">
+                <span class="button-icon">▶️</span>Rejoindre une partie
+            </button>
+            <button onclick="showPlayers()" class="game-button">
+                <span class="button-icon">👥</span>En ligne <span id="online-player-count" class="player-count">0</span>
+            </button>
+            <button onclick="showLeaderboard()" class="game-button">
+                <span class="button-icon">🏆</span>Classement
+            </button>
+            <button onclick="showDiscord()" class="game-button">
+                <span class="button-icon">💬</span>Discord
+            </button>
+            <button onclick="window.location.href='/logout'" class="game-button-deconnexion">
+                <span class="button-icon">🚪</span>Déconnexion
+            </button>
         </div>
     </div>
 
-    <!-- Ajouter dans le body -->
-<div id="playerModal" class="modal">
-    <div class="modal-content">
-        <span class="close-modal" onclick="document.getElementById('playerModal').style.display='none'">&times;</span>
-        <h2 id="modalPlayerName"></h2>
-        <button id="requestGameBtn" class="request-game">Demander un match</button>
-    </div>
-</div>
+    <div id="modalBackdrop" class="modal-backdrop"></div>
 
-<!-- Gardez seulement une instance de cette div -->
-<div id="matchRequest" class="notification">
-    <div id="requestText"></div>
-    <div class="notification-buttons">
-        <button onclick="acceptMatch()" class="accept-btn">Accepter</button>
-        <button onclick="declineMatch()" class="decline-btn">Refuser</button>
+    <div id="playersModal" class="modal">
+        <span class="close-button" onclick="hidePlayers()">&times;</span>
+        <h2>Joueurs en ligne (0)</h2>
+        <div id="online-players" class="player-list">
+            <div class="loading-text">Chargement des joueurs...</div>
+        </div>
     </div>
-</div>
+
+    <div id="leaderboardModal" class="modal">
+        <span class="close-button" onclick="hideLeaderboard()">&times;</span>
+        <h2>Classement</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>JOUEUR</th>
+                        <th>ELO</th>
+                        <th>PARTIES</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard">
+                    <tr>
+                        <td colspan="4" class="loading-text">Chargement du classement...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div id="DiscordModal" class="modal">
+        <span class="close-button" onclick="hideDiscord()">&times;</span>
+        <h2><a href="https://discord.com/ccG6x7Cv">Chat General</a></h2>
+        <h2><a href="https://discord.com/">Participation à Dots Capture 's Legend of Africa</a></h2>
+    </div>
+
+    <div id="playerModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closePlayerModal()">&times;</span>
+            <h2 id="modalPlayerName"></h2>
+            <button id="requestGameBtn" class="game-button primary">Demander un match</button>
+        </div>
+    </div>
 
     <div id="matchRequest" class="notification">
-        <span id="requestText"></span>
+        <div id="requestText"></div>
         <div class="notification-buttons">
-            <button class="accept-btn" onclick="acceptMatch()">Accepter</button>
-            <button class="decline-btn" onclick="declineMatch()">Refuser</button>
+            <button onclick="acceptMatch()" class="accept-btn">Accepter</button>
+            <button onclick="declineMatch()" class="decline-btn">Refuser</button>
         </div>
     </div>
 
     <script>
-        // Le même code JavaScript que précédemment
         const socket = io();
         let selectedPlayer = null;
-        const modal = document.getElementById('playerModal');
-        const matchRequest = document.getElementById('matchRequest');
 
+        // Fonctions de base
         function joinGame() {
             const gameId = document.getElementById('gameId').value;
             if (gameId) {
@@ -392,84 +475,92 @@
             }
         }
 
-        function createGame() {
-            socket.emit('createGame');
+
+        // Gestion des modales
+        function showPlayers() {
+            document.getElementById('playersModal').style.display = 'block';
+            document.getElementById('modalBackdrop').style.display = 'block';
         }
 
-        function showPlayerModal(player) {
-    selectedPlayer = player;
-    document.getElementById('modalPlayerName').textContent = player.username;
-    const requestBtn = document.getElementById('requestGameBtn');
-    requestBtn.disabled = player.inGame;
-    modal.style.display = 'block';
-}
+        function hidePlayers() {
+            document.getElementById('playersModal').style.display = 'none';
+            document.getElementById('modalBackdrop').style.display = 'none';
+        }
 
-        function closeModal() {
-            modal.style.display = 'none';
+        function showLeaderboard() {
+            document.getElementById('leaderboardModal').style.display = 'block';
+            document.getElementById('modalBackdrop').style.display = 'block';
+        }
+
+        function hideLeaderboard() {
+            document.getElementById('leaderboardModal').style.display = 'none';
+            document.getElementById('modalBackdrop').style.display = 'none';
+        }
+        function showDiscord() {
+            document.getElementById('DiscordModal').style.display = 'block';
+            document.getElementById('modalBackdrop').style.display = 'block';
+        }
+
+        function hideDiscord() {
+            document.getElementById('DiscordModal').style.display = 'none';
+            document.getElementById('modalBackdrop').style.display = 'none';
+        }
+
+        function handlePlayerClick(playerUsername, isInGame) {
+            if (isInGame) {
+                alert("Ce joueur est déjà en partie");
+                return;
+            }
+
+            selectedPlayer = { username: playerUsername };
+            const modal = document.getElementById('playerModal');
+            document.getElementById('modalPlayerName').textContent = playerUsername;
+            document.getElementById('requestGameBtn').onclick = requestGame;
+            modal.style.display = 'block';
+        }
+
+        function closePlayerModal() {
+            document.getElementById('playerModal').style.display = 'none';
             selectedPlayer = null;
         }
 
         function requestGame() {
             if (selectedPlayer) {
-                socket.emit('requestMatch', {
-                    toPlayer: selectedPlayer.username
-                });
-                closeModal();
+                socket.emit('requestMatch', { toPlayer: selectedPlayer.username });
+                closePlayerModal();
             }
         }
-
-        function handlePlayerClick(playerUsername, isInGame) {
-    console.log("Clic sur joueur:", playerUsername, "En jeu:", isInGame);
-    
-    if (isInGame) {
-        alert("Ce joueur est déjà en partie");
-        return;
-    }
-
-    // Afficher la modal
-    const modal = document.getElementById('playerModal');
-    const modalPlayerName = document.getElementById('modalPlayerName');
-    const requestGameBtn = document.getElementById('requestGameBtn');
-
-    modalPlayerName.textContent = playerUsername;
-    
-    // Configurer le bouton de demande de match
-    requestGameBtn.onclick = () => {
-        console.log("Envoi demande de match à:", playerUsername);
-        socket.emit('requestMatch', { toPlayer: playerUsername });
-        modal.style.display = 'none';
-    };
-
-    modal.style.display = 'block';
-}
 
         function showMatchRequest(fromPlayer) {
             const requestText = document.getElementById('requestText');
             requestText.textContent = `${fromPlayer} vous défie !`;
-            matchRequest.style.display = 'block';
+            document.getElementById('matchRequest').style.display = 'block';
         }
 
         function acceptMatch() {
             socket.emit('acceptMatch');
-            matchRequest.style.display = 'none';
+            document.getElementById('matchRequest').style.display = 'none';
         }
 
         function declineMatch() {
             socket.emit('declineMatch');
-            matchRequest.style.display = 'none';
+            document.getElementById('matchRequest').style.display = 'none';
         }
 
-   
-        
+        // Socket.io event listeners
         socket.on("connect", () => {
-    console.log("Socket connecté, ID:", socket.id);
-    socket.emit("requestOnlinePlayers");
-});
+            console.log("Socket connecté, ID:", socket.id);
+            socket.emit("requestOnlinePlayers");
+            socket.emit("requestLeaderboard");
+        });
 
-socket.on("updateOnlinePlayers", (players) => {
-    console.log("Mise à jour des joueurs:", players);
+        socket.on("updateOnlinePlayers", (players) => {
     const container = document.getElementById('online-players');
+    const playerCount = document.getElementById('online-player-count');
     
+    // Mettre à jour le compteur sur le bouton
+    playerCount.textContent = players ? players.length : 0;
+
     if (!players || players.length === 0) {
         container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
         return;
@@ -487,38 +578,48 @@ socket.on("updateOnlinePlayers", (players) => {
             </div>
         `).join('');
 
-    // Mettre à jour le compteur
-    document.querySelector('.card-title').textContent = 
+    document.querySelector('#playersModal h2').textContent = 
         `Joueurs en ligne (${players.length})`;
 });
 
-// Rafraîchir toutes les 5 secondes
-setInterval(() => {
-    socket.emit("requestOnlinePlayers");
-}, 5000);
-
         socket.on('updateLeaderboard', (leaderboard) => {
             const tbody = document.getElementById('leaderboard');
-            
+
             if (!leaderboard || leaderboard.length === 0) {
                 tbody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="loading-text">Aucune donnée disponible</td>
-                    </tr>`;
+            <tr>
+                <td colspan="4" class="loading-text">Aucune donnée disponible</td>
+            </tr>`;
                 return;
             }
 
-            tbody.innerHTML = '';
-            leaderboard.forEach((player, index) => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${index + 1}</td>
-                        <td>${player.username}</td>
-                        <td>${player.score || 0}</td>
-                        <td>${player.games_played || 0}</td>
-                    </tr>
-                `;
-            });
+            tbody.innerHTML = leaderboard
+                .map((player, index) => {
+                    // Définir l'icône ou le numéro en fonction du rang
+                    let rankDisplay;
+                    switch (index) {
+                        case 0:
+                            rankDisplay = '<span class="rank-icon">🏆</span>';
+                            break;
+                        case 1:
+                            rankDisplay = '<span class="rank-icon">🥈</span>';
+                            break;
+                        case 2:
+                            rankDisplay = '<span class="rank-icon">🥉</span>';
+                            break;
+                        default:
+                            rankDisplay = `<span class="rank-number">${index + 1}</span>`;
+                    }
+
+                    return `
+                <tr>
+                    <td>${rankDisplay}</td>
+                    <td>${player.username}</td>
+                    <td>${player.score || 0}</td>
+                    <td>${player.games_played || 0}</td>
+                </tr>
+            `;
+                }).join('');
         });
 
         socket.on('matchRequest', (data) => {
@@ -548,23 +649,28 @@ setInterval(() => {
             alert(`${player} a décliné votre demande de match.`);
         });
 
-        window.onclick = (event) => {
-            if (event.target == modal) {
-                closeModal();
-            }
-        }
+        // Gestionnaires d'événements
+        document.getElementById('modalBackdrop').onclick = () => {
+            hidePlayers();
+            hideLeaderboard();
+            closePlayerModal();
+        };
 
+        // Rafraîchissement périodique
         setInterval(() => {
-            socket.emit('requestOnlinePlayers');
-            socket.emit('requestLeaderboard');
+            socket.emit("requestOnlinePlayers");
+            socket.emit("requestLeaderboard");
         }, 5000);
 
-        // Ajout d'un gestionnaire pour le clic tactile
-        document.addEventListener('touchstart', function(e) {
-            if (e.target == modal) {
-                closeModal();
+        // Gestion du tactile
+        document.addEventListener('touchstart', function (e) {
+            if (e.target.classList.contains('modal-backdrop')) {
+                hidePlayers();
+                hideLeaderboard();
+                closePlayerModal();
             }
         });
     </script>
 </body>
+
 </html>
