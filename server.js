@@ -76,7 +76,7 @@ db.connect((err) => {
 `;
 
 const createGameHistoryTable = `
-  CREATE TABLE IF NOT EXISTS game_history (
+  CREATE TABLE IF NOT EXISTS games_history (
     id INT(11) NOT NULL AUTO_INCREMENT,
     game_id VARCHAR(255) NOT NULL,
     player_username VARCHAR(255) NOT NULL,
@@ -98,8 +98,8 @@ const createGameHistoryTable = `
 
 
 db.query(createGamesHistoryTable, (err) => {
-  if (err) console.error("Erreur lors de la création de la table game_history:", err);
-  else console.log("Table game_history créée avec succès.");
+  if (err) console.error("Erreur lors de la création de la table games_history:", err);
+  else console.log("Table games_history créée avec succès.");
 });
 });
 
@@ -455,7 +455,7 @@ socket.on('abandonGame', async ({ gameId, player }) => {
       try {
           // Insérer dans l'historique
           await queryAsync(
-              'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+              'INSERT INTO games_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
               [gameId, player1.username, player2.username, player1Score, 'abandon']
           );
 
@@ -471,12 +471,12 @@ socket.on('abandonGame', async ({ gameId, player }) => {
               )
           ]);
 
-          // Mettre à jour games_played en se basant sur game_history
+          // Mettre à jour games_played en se basant sur games_history
           await queryAsync(`
               UPDATE users u 
               SET games_played = (
                   SELECT COUNT(*) 
-                  FROM game_history 
+                  FROM games_history 
                   WHERE player_username = u.username
                   OR opponent_username = u.username
               )
@@ -547,7 +547,7 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
       try {
           // Insérer dans l'historique
           await queryAsync(
-              'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+              'INSERT INTO games_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
               [gameId, player1.username, player2.username, player1Score, 'timeout']
           );
 
@@ -563,12 +563,12 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
               )
           ]);
 
-          // Mettre à jour games_played en se basant sur game_history
+          // Mettre à jour games_played en se basant sur games_history
           await queryAsync(`
               UPDATE users u 
               SET games_played = (
                   SELECT COUNT(*) 
-                  FROM game_history 
+                  FROM games_history 
                   WHERE player_username = u.username
                   OR opponent_username = u.username
               )
@@ -683,7 +683,7 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
         try {
             // Vérifier si la partie est déjà enregistrée
             const historyExists = await queryAsync(
-                'SELECT 1 FROM game_history WHERE game_id = ? LIMIT 1',
+                'SELECT 1 FROM games_history WHERE game_id = ? LIMIT 1',
                 [gameId]
             );
   
@@ -700,17 +700,17 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
                   ),
                   // Enregistrer dans l'historique
                   queryAsync(
-                      'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+                      'INSERT INTO games_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
                       [gameId, player1.username, player2.username, player1Score, 'miseATerre']
                   )
               ]);
           
-              // Mettre à jour games_played APRÈS en se basant sur game_history
+              // Mettre à jour games_played APRÈS en se basant sur games_history
               await queryAsync(`
                   UPDATE users u 
                   SET games_played = (
                       SELECT COUNT(*) 
-                      FROM game_history 
+                      FROM games_history 
                       WHERE player_username = u.username
                       OR opponent_username = u.username
                   )
@@ -832,7 +832,7 @@ async function handleGameEnd(gameId, winner, reason) {
               ),
               // Enregistrer dans l'historique
               queryAsync(
-                  'INSERT INTO game_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
+                  'INSERT INTO games_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
                   [gameId, player1.username, player2.username, p1Score, reason]
               )
           ]);
@@ -842,7 +842,7 @@ async function handleGameEnd(gameId, winner, reason) {
               UPDATE users u 
               SET games_played = (
                   SELECT COUNT(*) 
-                  FROM game_history 
+                  FROM games_history 
                   WHERE player_username = u.username 
                   OR opponent_username = u.username
               )
