@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require("express");
 const app = express();
 const http = require("http").createServer(app);
@@ -8,12 +9,13 @@ const MySQLStore = require("express-mysql-session")(session);
 const bcrypt = require("bcryptjs");
 const bodyParser = require("body-parser"); // Ajout de cette ligne
 
+// Configuration de la base de données
 const dbConfig = {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306
+  host: process.env.MYSQLHOST || "localhost",
+  user: process.env.MYSQLUSER || "root",
+  password: process.env.MYSQLPASSWORD || "",
+  database: process.env.MYSQLDATABASE || "faritanyX",
+  port: process.env.MYSQLPORT || 3306
 };
 
 
