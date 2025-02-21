@@ -75,7 +75,7 @@ db.connect((err) => {
   );
 `;
 
-const createGameHistoryTable = `
+const createGamesHistoryTable = `
   CREATE TABLE IF NOT EXISTS games_history (
     id INT(11) NOT NULL AUTO_INCREMENT,
     game_id VARCHAR(255) NOT NULL,
