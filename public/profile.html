@@ -112,7 +112,7 @@
         }
 
         .match-details {
-            font-size: 0.9em;
+            font-size: 0.6em;
             color: #666;
         }
 
@@ -241,7 +241,7 @@
                 const matchHistory = document.getElementById('matchHistory');
                 matchHistory.innerHTML = data.matchHistory.map(match => {
     const endReasonMap = {
-        'timeout': 'Temps écoulé',
+        'timeoutGame': 'Temps écoulé',
         'abandonGame': 'Abandon',
         'miseATerre': 'Mise à terre'
     };
