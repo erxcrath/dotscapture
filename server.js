@@ -10,13 +10,14 @@ const bcrypt = require("bcryptjs");
 const bodyParser = require("body-parser"); // Ajout de cette ligne
 
 // Configuration de la base de données
-const dbConfig = {
+/**/const dbConfig = {
   host: process.env.MYSQLHOST || "localhost",
   user: process.env.MYSQLUSER || "root",
   password: process.env.MYSQLPASSWORD || "",
   database: process.env.MYSQLDATABASE || "faritanyX",
   port: process.env.MYSQLPORT || 3306
 };
+/**/
 
 
 /*const dbConfig = {
@@ -25,8 +26,8 @@ const dbConfig = {
   password: "",
   database: "faritanyX",
   port: 3306,
-};
-*/
+};*/
+
 // Créer la connexion à la base de données
 const db = mysql.createConnection(dbConfig);
 // Créer le store de session

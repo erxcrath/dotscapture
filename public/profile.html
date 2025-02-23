@@ -192,7 +192,6 @@
 </head>
 <body>
     <div class="profile-container">
-        <a href="/accueil" class="back-button">← Retour</a>
         
         <div class="profile-header">
             <h1 class="username" id="profileUsername">Chargement...</h1>
@@ -243,7 +242,7 @@
                 matchHistory.innerHTML = data.matchHistory.map(match => {
     const endReasonMap = {
         'timeout': 'Temps écoulé',
-        'abandon': 'Abandon',
+        'abandonGame': 'Abandon',
         'miseATerre': 'Mise à terre'
     };
     
@@ -252,23 +251,21 @@
     const eloChangeText = `${eloChange >= 0 ? '+' : ''}${eloChange}`;
 
     return `
-        <div class="match-item">
-            <div class="match-info">
-                <div>
-                    <strong>VS ${match.opponent_username}</strong>
-                    <span class="end-reason">${endReasonMap[match.end_reason] || match.end_reason}</span>
-                    <span class="elo-change ${eloChangeClass}">${eloChangeText} ELO</span>
-                </div>
-                <div class="match-details">
-                    ${new Date(match.created_at).toLocaleString('fr-FR')}
-                    <span class="elo-details">(${match.player_elo_before} → ${match.player_elo_after})</span>
-                </div>
+    <div class="match-item">
+        <div class="match-info">
+            <div>
+                <strong>VS ${match.opponent_username}</strong>
             </div>
-            <span class="match-result ${match.result === 1 ? 'win' : 'loss'}">
-                ${match.result === 1 ? 'Victoire' : 'Défaite'}
-            </span>
+            <div class="match-details">
+                ${new Date(match.created_at).toLocaleString('fr-FR')}
+                <span class="elo-details">(${match.player_elo_before} → <strong>${match.player_elo_after}</strong>)</span>
+            </div>
         </div>
-    `;
+        <span class="match-result ${match.result === 1 ? 'win' : 'loss'}">
+            ${eloChangeText} ELO ${endReasonMap[match.end_reason] || match.end_reason}
+        </span>
+    </div>
+`;
 }).join('');
             })
             .catch(error => {
