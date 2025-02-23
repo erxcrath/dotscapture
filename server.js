@@ -25,7 +25,8 @@ const dbConfig = {
   password: "",
   database: "faritanyX",
   port: 3306,
-};*/
+};
+*/
 // Créer la connexion à la base de données
 const db = mysql.createConnection(dbConfig);
 // Créer le store de session
@@ -82,6 +83,8 @@ const createGamesHistoryTable = `
     player_username VARCHAR(255) NOT NULL,
     opponent_username VARCHAR(255) NOT NULL,
     result FLOAT NOT NULL,
+    player_elo_before INT NOT NULL,
+    player_elo_after INT NOT NULL,
     end_reason VARCHAR(50) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
@@ -219,6 +222,8 @@ app.post("/login", (req, res) => {
     res.status(400).send("Please enter username and password");
   }
 });
+
+
 app.get("/accueil", (req, res) => {
   console.log("Tentative d'accès à /accueil");
   console.log("Session:", req.session);
@@ -241,6 +246,73 @@ app.get("/accueil", (req, res) => {
     console.log("Utilisateur non authentifié, redirection vers /login");
     res.redirect("/login");
   }
+});
+
+// Ajouter cette route dans votre section des routes
+app.get("/profile/:username", (req, res) => {
+  if (!req.session || !req.session.loggedin) {
+    return res.redirect("/login");
+  }
+  
+  const username = req.params.username;
+  res.sendFile(__dirname + "/public/profile.html");
+});
+
+// Remplacer la route API du profil par celle-ci
+app.get("/api/profile/:username", (req, res) => {
+  const username = req.params.username;
+  
+  // Requête pour les données utilisateur
+  db.query(
+    "SELECT username, score, games_played FROM users WHERE username = ?",
+    [username],
+    (err, userData) => {
+      if (err) {
+        console.error("Erreur lors de la récupération des données utilisateur:", err);
+        return res.status(500).json({ error: "Erreur serveur" });
+      }
+
+      // Requête pour l'historique des matches avec les scores ELO
+      db.query(
+        `SELECT 
+          gh.game_id,
+          gh.opponent_username,
+          gh.result,
+          gh.end_reason,
+          gh.created_at,
+          gh.player_elo_before,
+          gh.player_elo_after,
+          (gh.player_elo_after - gh.player_elo_before) as elo_change
+        FROM games_history gh
+        WHERE gh.player_username = ?
+        ORDER BY gh.created_at DESC 
+        LIMIT 10`,
+        [username],
+        (err, matchHistory) => {
+          if (err) {
+            console.error("Erreur lors de la récupération de l'historique:", err);
+            return res.status(500).json({ error: "Erreur serveur" });
+          }
+
+          const stats = {
+            totalGames: userData[0].games_played,
+            wins: matchHistory.filter(match => match.result === 1).length,
+            losses: matchHistory.filter(match => match.result === 0).length,
+            currentElo: userData[0].score,
+            winRate: userData[0].games_played > 0 
+              ? Math.round((matchHistory.filter(match => match.result === 1).length / userData[0].games_played) * 100)
+              : 0
+          };
+
+          res.json({
+            user: userData[0],
+            stats,
+            matchHistory
+          });
+        }
+      );
+    }
+  );
 });
 
 app.get("/login", (req, res) => {
@@ -455,9 +527,31 @@ socket.on('abandonGame', async ({ gameId, player }) => {
       try {
           // Insérer dans l'historique
           await queryAsync(
-              'INSERT INTO games_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
-              [gameId, player1.username, player2.username, player1Score, 'abandon']
-          );
+            'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+                gameId, 
+                player1.username, 
+                player2.username, 
+                player1Score, 
+                player1Elo,       // ELO avant
+                newPlayer1Elo,    // ELO après
+                'abandonGame'
+            ]
+        );
+        
+        // Faire la même chose pour le joueur 2
+        await queryAsync(
+            'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+                gameId, 
+                player2.username, 
+                player1.username, 
+                player2Score,
+                player2Elo,       // ELO avant
+                newPlayer2Elo,    // ELO après
+                'abandonGame'
+            ]
+        );
 
           // Mettre à jour les scores
           await Promise.all([
@@ -547,9 +641,31 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
       try {
           // Insérer dans l'historique
           await queryAsync(
-              'INSERT INTO games_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
-              [gameId, player1.username, player2.username, player1Score, 'timeout']
-          );
+            'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+                gameId, 
+                player1.username, 
+                player2.username, 
+                player1Score, 
+                player1Elo,       // ELO avant
+                newPlayer1Elo,    // ELO après
+                'timeoutGame'
+            ]
+        );
+        
+        // Faire la même chose pour le joueur 2
+        await queryAsync(
+            'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+                gameId, 
+                player2.username, 
+                player1.username, 
+                player2Score,
+                player2Elo,       // ELO avant
+                newPlayer2Elo,    // ELO après
+                'timeoutGame'
+            ]
+        );
 
           // Mettre à jour les scores
           await Promise.all([
@@ -689,21 +805,26 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
   
             if (!historyExists.length) {
               await Promise.all([
-                  // Mise à jour des scores uniquement
-                  queryAsync(
-                      'UPDATE users SET score = ? WHERE username = ?',
-                      [newPlayer1Elo, player1.username]
-                  ),
-                  queryAsync(
-                      'UPDATE users SET score = ? WHERE username = ?',
-                      [newPlayer2Elo, player2.username]
-                  ),
-                  // Enregistrer dans l'historique
-                  queryAsync(
-                      'INSERT INTO games_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
-                      [gameId, player1.username, player2.username, player1Score, 'miseATerre']
-                  )
-              ]);
+                // Mise à jour des scores uniquement
+                queryAsync(
+                    'UPDATE users SET score = ? WHERE username = ?',
+                    [newPlayer1Elo, player1.username]
+                ),
+                queryAsync(
+                    'UPDATE users SET score = ? WHERE username = ?',
+                    [newPlayer2Elo, player2.username]
+                ),
+                // Enregistrer l'historique pour le joueur 1
+                queryAsync(
+                    'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [gameId, player1.username, player2.username, player1Score, player1Elo, newPlayer1Elo, 'miseATerre']
+                ),
+                // Enregistrer l'historique pour le joueur 2
+                queryAsync(
+                    'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [gameId, player2.username, player1.username, player2Score, player2Elo, newPlayer2Elo, 'miseATerre']
+                )
+            ]);
           
               // Mettre à jour games_played APRÈS en se basant sur games_history
               await queryAsync(`

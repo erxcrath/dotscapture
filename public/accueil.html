@@ -7,36 +7,76 @@
     <title>Jeu de Points</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
+        .modal-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
 
-.player-name-country {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
+        .modal-buttons button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
 
-.country-flag {
-    font-size: 0.9em;
-    color: #666;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
+        .profile-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
 
-.player-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            margin: 0;
+            color: #4a5568;
+            font-size: 14px;
+        }
+
+        .stat-card p {
+            margin: 5px 0 0;
+            font-size: 24px;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .elo-history {
+            margin-top: 20px;
+        }
+
+        .matches-history {
+            margin-top: 20px;
+        }
+
         .button-icon {
             margin-right: 8px;
             font-size: 18px;
         }
-    
-        .game-button, .game-button-deconnexion {
-            gap: 8px;  /* Espace entre l'icône et le texte */
+
+        .game-button,
+        .game-button-deconnexion {
+            gap: 8px;
+            /* Espace entre l'icône et le texte */
         }
-        
+
         .player-count {
             background-color: #4caf50;
             color: white;
@@ -45,7 +85,7 @@
             margin-left: 8px;
             font-size: 14px;
         }
-    
+
         body {
             margin: 0;
             padding: 0;
@@ -56,49 +96,49 @@
             flex-direction: column;
             align-items: center;
         }
-    
+
         .game-container {
             width: 90%;
             max-width: 400px;
-            margin:  auto;
+            margin: auto;
             padding: 20px;
             background-color: rgb(0, 0, 0);
             border-radius: 15px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
-    
+
         .game-logo {
             display: flex;
             flex-direction: column;
             align-items: center;
         }
-    
+
         .game-logo img:first-child {
             order: -1;
         }
-    
+
         .buttons-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
             margin-top: 20px;
         }
-    
+
         .game-input {
             grid-column: 1 / -1;
         }
-    
+
         .full-width {
             grid-column: 1 / -1;
         }
-    
+
         .game-title {
             font-size: 24px;
             color: #2c3e50;
             text-align: center;
             margin: 10px 0 30px 0;
         }
-    
+
         .game-button {
             width: 100%;
             padding: 15px;
@@ -115,7 +155,7 @@
             justify-content: center;
             transition: all 0.3s ease;
         }
-    
+
         .game-button-deconnexion {
             width: 100%;
             padding: 15px;
@@ -132,28 +172,28 @@
             justify-content: center;
             transition: all 0.3s ease;
         }
-    
+
         .game-button:hover {
             background-color: #4fb18b;
             transform: translateY(-2px);
             color: black;
         }
-    
+
         .game-button-deconnexion:hover {
             background-color: #b14f4f;
             transform: translateY(-2px);
             color: black;
         }
-    
+
         .game-button.primary {
             background-color: #4fb18b;
             color: white;
         }
-    
+
         .game-button.primary:hover {
             background-color: #1f9232;
         }
-    
+
         .game-input {
             width: 100%;
             padding: 15px;
@@ -162,7 +202,7 @@
             font-size: 16px;
             box-sizing: border-box;
         }
-    
+
         .modal {
             display: none;
             position: fixed;
@@ -177,7 +217,7 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             z-index: 1000;
         }
-    
+
         .modal-backdrop {
             display: none;
             position: fixed;
@@ -188,7 +228,7 @@
             background-color: rgba(0, 0, 0, 0.5);
             z-index: 999;
         }
-    
+
         .close-button {
             position: absolute;
             top: 15px;
@@ -197,11 +237,11 @@
             cursor: pointer;
             color: #999;
         }
-    
+
         .player-list {
             margin-top: 15px;
         }
-    
+
         .player-card {
             padding: 15px;
             margin: 10px 0;
@@ -210,28 +250,28 @@
             cursor: pointer;
             transition: all 0.3s ease;
         }
-    
+
         .player-card:hover {
             background-color: #e8f0fe;
             transform: translateY(-2px);
         }
-    
+
         .player-info {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-    
+
         .status-in-game {
             color: #f44336;
             font-size: 14px;
         }
-    
+
         .status-available {
             color: #4caf50;
             font-size: 14px;
         }
-    
+
         .notification {
             display: none;
             position: fixed;
@@ -246,13 +286,13 @@
             width: 90%;
             max-width: 400px;
         }
-    
+
         .notification-buttons {
             display: flex;
             gap: 10px;
             margin-top: 15px;
         }
-    
+
         .notification-buttons button {
             flex: 1;
             padding: 12px;
@@ -263,36 +303,36 @@
             cursor: pointer;
             transition: all 0.3s ease;
         }
-    
+
         .accept-btn {
             background-color: #4a90e2;
             color: white;
         }
-    
+
         .decline-btn {
             background-color: #e8f0fe;
             color: #4a90e2;
         }
-    
+
         .table-container {
             overflow-x: auto;
             margin: 20px 0;
             border-radius: 10px;
             background: white;
         }
-    
+
         .game-image {
             width: 100%;
             height: auto;
         }
-    
+
         table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
             background: white;
         }
-    
+
         th {
             background-color: #f8f9fa;
             color: #2c3e50;
@@ -305,103 +345,105 @@
             top: 0;
             z-index: 10;
         }
-    
+
         td {
             padding: 16px;
             border-bottom: 1px solid #f0f4f8;
             color: #4a5568;
             font-size: 15px;
         }
-    
+
         tbody tr {
             transition: all 0.2s ease;
         }
-    
+
         tbody tr:hover {
             background-color: #f8fafc;
             transform: translateY(-1px);
         }
-    
+
         .rank-icon {
             font-size: 20px;
             display: inline-block;
             vertical-align: middle;
         }
-    
+
         td:first-child {
             font-size: 0;
         }
-    
+
         td:first-child .rank-icon {
             font-size: 20px;
         }
-    
+
         td:first-child .rank-number {
             font-size: 15px;
             color: #4a90e2;
             font-weight: 600;
         }
-    
+
         td:nth-child(2) {
             font-weight: 500;
         }
-    
+
         td:nth-child(3) {
             font-weight: 600;
             color: #2c5282;
         }
-    
+
         td:nth-child(4) {
             color: #718096;
         }
-    
+
         tbody tr:nth-child(1) td:first-child {
             color: #ffd700;
             font-weight: 700;
         }
-    
+
         tbody tr:nth-child(2) td:first-child {
             color: #c0c0c0;
             font-weight: 700;
         }
-    
+
         tbody tr:nth-child(3) td:first-child {
             color: #cd7f32;
             font-weight: 700;
         }
-    
+
         .loading-text {
             text-align: center;
             color: #718096;
             padding: 30px;
             font-style: italic;
         }
-    
+
         @media (max-width: 320px) {
-    .buttons-grid {
-        grid-template-columns: 1fr 1fr; /* Deux colonnes même sur petits écrans */
-        gap: 5px;  /* Moins d'espace entre les boutons */
-    }
+            .buttons-grid {
+                grid-template-columns: 1fr 1fr;
+                /* Deux colonnes même sur petits écrans */
+                gap: 5px;
+                /* Moins d'espace entre les boutons */
+            }
 
-    .game-title {
-        font-size: 18px;
-        margin-bottom: 20px;
-    }
+            .game-title {
+                font-size: 18px;
+                margin-bottom: 20px;
+            }
 
-    .game-button, .game-button-deconnexion {
-        padding: 12px;
-        font-size: 14px;
-    }
+            .game-button,
+            .game-button-deconnexion {
+                padding: 12px;
+                font-size: 14px;
+            }
 
-    .game-input {
-        padding: 12px;
-        font-size: 14px;
-    }
-}
-
+            .game-input {
+                padding: 12px;
+                font-size: 14px;
+            }
+        }
     </style>
-    
-    
+
+
 </head>
 
 <body>
@@ -472,7 +514,10 @@
         <div class="modal-content">
             <span class="close-button" onclick="closePlayerModal()">&times;</span>
             <h2 id="modalPlayerName"></h2>
-            <button id="requestGameBtn" class="game-button primary">Demander un match</button>
+            <div class="modal-buttons">
+                <button id="requestGameBtn" class="game-button primary" onclick="requestGame()">Demander un match</button>
+                <button id="viewProfileBtn" class="game-button" onclick="viewProfile()">Voir le profil</button>
+            </div>
         </div>
     </div>
 
@@ -487,7 +532,7 @@
     <script>
 
         // Au début du script, ajoutez une variable pour stocker le username courant
-let currentUsername = '';
+        let currentUsername = '';
         const socket = io();
         let selectedPlayer = null;
 
@@ -497,6 +542,28 @@ let currentUsername = '';
             if (gameId) {
                 socket.emit('joinGame', gameId);
             }
+        }
+
+        // Ajouter cette fonction dans votre script
+        function viewProfile() {
+            const username = document.getElementById('modalPlayerName').textContent;
+            window.location.href = `/profile/${username}`;
+        }
+
+        // Modifier la fonction handlePlayerClick
+        function handlePlayerClick(playerUsername, isInGame) {
+            selectedPlayer = { username: playerUsername };
+            const modal = document.getElementById('playerModal');
+            document.getElementById('modalPlayerName').textContent = playerUsername;
+
+            // Afficher/cacher le bouton de demande de match selon le statut
+            const requestGameBtn = document.getElementById('requestGameBtn');
+            const viewProfileBtn = document.getElementById('viewProfileBtn');
+
+            requestGameBtn.style.display = isInGame ? 'none' : 'block';
+            viewProfileBtn.style.display = 'block';
+
+            modal.style.display = 'block';
         }
 
 
@@ -531,26 +598,26 @@ let currentUsername = '';
         }
 
         function handlePlayerClick(playerUsername, isInGame) {
-    if (isInGame) {
-        alert("Ce joueur est déjà en partie");
-        return;
-    }
+            if (isInGame) {
+                alert("Ce joueur est déjà en partie");
+                return;
+            }
 
-    selectedPlayer = { username: playerUsername };
-    const modal = document.getElementById('playerModal');
-    document.getElementById('modalPlayerName').textContent = playerUsername;
-    
-    // Utiliser currentUsername pour la comparaison
-    const requestGameBtn = document.getElementById('requestGameBtn');
-    if (playerUsername === currentUsername) {
-        requestGameBtn.style.display = 'none';
-    } else {
-        requestGameBtn.style.display = 'block';
-        requestGameBtn.onclick = requestGame;
-    }
-    
-    modal.style.display = 'block';
-}
+            selectedPlayer = { username: playerUsername };
+            const modal = document.getElementById('playerModal');
+            document.getElementById('modalPlayerName').textContent = playerUsername;
+
+            // Utiliser currentUsername pour la comparaison
+            const requestGameBtn = document.getElementById('requestGameBtn');
+            if (playerUsername === currentUsername) {
+                requestGameBtn.style.display = 'none';
+            } else {
+                requestGameBtn.style.display = 'block';
+                requestGameBtn.onclick = requestGame;
+            }
+
+            modal.style.display = 'block';
+        }
 
         function closePlayerModal() {
             document.getElementById('playerModal').style.display = 'none';
@@ -581,13 +648,13 @@ let currentUsername = '';
         }
 
         // Après la création du socket, ajoutez :
-fetch('/check-session')
-    .then(response => response.json())
-    .then(data => {
-        if (data.authenticated) {
-            currentUsername = data.username;
-        }
-    });
+        fetch('/check-session')
+            .then(response => response.json())
+            .then(data => {
+                if (data.authenticated) {
+                    currentUsername = data.username;
+                }
+            });
 
         // Socket.io event listeners
         socket.on("connect", () => {
@@ -597,34 +664,32 @@ fetch('/check-session')
         });
 
         socket.on("updateOnlinePlayers", (players) => {
-    const container = document.getElementById('online-players');
-    const playerCount = document.getElementById('online-player-count');
-    
-    playerCount.textContent = players ? players.length : 0;
+            const container = document.getElementById('online-players');
+            const playerCount = document.getElementById('online-player-count');
 
-    if (!players || players.length === 0) {
-        container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
-        return;
-    }
+            // Mettre à jour le compteur sur le bouton
+            playerCount.textContent = players ? players.length : 0;
 
-    container.innerHTML = players
-        .map(player => `
+            if (!players || players.length === 0) {
+                container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
+                return;
+            }
+
+            container.innerHTML = players
+                .map(player => `
             <div class="player-card" onclick="handlePlayerClick('${player.username}', ${player.inGame})">
                 <div class="player-info">
-                    <div class="player-name-country">
-                        <strong>${player.username}</strong>
-                        <span class="country-flag">${player.country ? `🌍 ${player.country}` : '🌍'}</span>
-                    </div>
-                    ${player.inGame ? 
-                        '<span class="status-in-game">(En partie)</span>' : 
+                    ${player.username} 
+                    ${player.inGame ?
+                        '<span class="status-in-game">(En partie)</span>' :
                         '<span class="status-available">(Disponible)</span>'}
                 </div>
             </div>
         `).join('');
 
-    document.querySelector('#playersModal h2').textContent = 
-        `Joueurs en ligne (${players.length})`;
-});
+            document.querySelector('#playersModal h2').textContent =
+                `Joueurs en ligne (${players.length})`;
+        });
 
         socket.on('updateLeaderboard', (leaderboard) => {
             const tbody = document.getElementById('leaderboard');

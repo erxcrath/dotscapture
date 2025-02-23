@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil Joueur - Dots Capture</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        .profile-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .profile-header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .username {
+            font-size: 24px;
+            margin: 0;
+            color: #2d3748;
+        }
+
+        .elo-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #4a90e2;
+            color: white;
+            border-radius: 20px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-card h3 {
+            margin: 0;
+            color: #4a5568;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .stat-card p {
+            margin: 10px 0 0;
+            font-size: 24px;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .match-history {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .match-history h2 {
+            color: #2d3748;
+            margin-top: 0;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #edf2f7;
+        }
+
+        .match-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #edf2f7;
+            transition: background-color 0.2s;
+        }
+
+        .match-item:hover {
+            background-color: #f8fafc;
+        }
+
+        .match-info {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .match-details {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .match-result {
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .win { 
+            background: #c6f6d5; 
+            color: #2f855a; 
+        }
+
+        .loss { 
+            background: #fed7d7; 
+            color: #c53030; 
+        }
+
+        .elo-change {
+            font-weight: bold;
+            margin-left: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .elo-positive { 
+            color: #2f855a;
+            background: #f0fff4;
+        }
+
+        .elo-negative { 
+            color: #c53030;
+            background: #fff5f5;
+        }
+
+        .end-reason {
+            font-size: 0.85em;
+            padding: 3px 8px;
+            background: #edf2f7;
+            border-radius: 4px;
+            margin-left: 10px;
+            color: #4a5568;
+        }
+
+        .back-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #4a90e2;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            transition: background-color 0.2s;
+        }
+
+        .back-button:hover {
+            background: #357abd;
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .match-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .match-result {
+                align-self: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="profile-container">
+        <a href="/accueil" class="back-button">← Retour</a>
+        
+        <div class="profile-header">
+            <h1 class="username" id="profileUsername">Chargement...</h1>
+            <div class="elo-badge" id="currentElo">ELO: --</div>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+            <!-- Les stats seront insérées ici -->
+        </div>
+
+        <div class="match-history">
+            <h2>Historique des parties</h2>
+            <div id="matchHistory">
+                <!-- L'historique sera inséré ici -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Récupérer le nom d'utilisateur depuis l'URL
+        const username = window.location.pathname.split('/').pop();
+
+        // Charger les données du profil
+        fetch(`/api/profile/${username}`)
+            .then(response => response.json())
+            .then(data => {
+                // Mettre à jour l'en-tête du profil
+                document.getElementById('profileUsername').textContent = data.user.username;
+                document.getElementById('currentElo').textContent = `ELO: ${data.stats.currentElo}`;
+
+                // Mettre à jour les stats
+                const statsGrid = document.getElementById('statsGrid');
+                statsGrid.innerHTML = `
+                    </div>
+                    <div class="stat-card">
+                        <h3>Victoires</h3>
+                        <p>${data.stats.wins} / ${data.stats.totalGames}</p>
+                    </div>
+                
+                    <div class="stat-card">
+                        <h3>Taux de victoire</h3>
+                        <p>${data.stats.winRate}%</p>
+                    </div>
+                `;
+
+                // Mettre à jour l'historique des matches
+                const matchHistory = document.getElementById('matchHistory');
+                matchHistory.innerHTML = data.matchHistory.map(match => {
+    const endReasonMap = {
+        'timeout': 'Temps écoulé',
+        'abandon': 'Abandon',
+        'miseATerre': 'Mise à terre'
+    };
+    
+    const eloChange = match.elo_change;
+    const eloChangeClass = eloChange >= 0 ? 'elo-positive' : 'elo-negative';
+    const eloChangeText = `${eloChange >= 0 ? '+' : ''}${eloChange}`;
+
+    return `
+        <div class="match-item">
+            <div class="match-info">
+                <div>
+                    <strong>VS ${match.opponent_username}</strong>
+                    <span class="end-reason">${endReasonMap[match.end_reason] || match.end_reason}</span>
+                    <span class="elo-change ${eloChangeClass}">${eloChangeText} ELO</span>
+                </div>
+                <div class="match-details">
+                    ${new Date(match.created_at).toLocaleString('fr-FR')}
+                    <span class="elo-details">(${match.player_elo_before} → ${match.player_elo_after})</span>
+                </div>
+            </div>
+            <span class="match-result ${match.result === 1 ? 'win' : 'loss'}">
+                ${match.result === 1 ? 'Victoire' : 'Défaite'}
+            </span>
+        </div>
+    `;
+}).join('');
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                alert('Erreur lors du chargement du profil');
+            });
+    </script>
+</body>
+</html>
