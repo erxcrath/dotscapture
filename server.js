@@ -1,4 +1,5 @@
 require('dotenv').config();
+const fetch = require('node-fetch');
 const express = require("express");
 const app = express();
 const http = require("http").createServer(app);
@@ -19,13 +20,13 @@ const dbConfig = {
 };
 
 
-//const dbConfig = {
-  //host: "localhost",
-  //user: "root",
-  //password: "",
-  //database: "faritanyX",
-  //port: 3306,
-//};
+/*const dbConfig = {
+  host: "localhost",
+  user: "root",
+  password: "",
+  database: "faritanyX",
+  port: 3306,
+};*/
 // Créer la connexion à la base de données
 const db = mysql.createConnection(dbConfig);
 // Créer le store de session

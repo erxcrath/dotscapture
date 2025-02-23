@@ -7,6 +7,27 @@
     <title>Jeu de Points</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
+
+.player-name-country {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.country-flag {
+    font-size: 0.9em;
+    color: #666;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.player-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
         .button-icon {
             margin-right: 8px;
             font-size: 18px;
@@ -464,6 +485,9 @@
     </div>
 
     <script>
+
+        // Au début du script, ajoutez une variable pour stocker le username courant
+let currentUsername = '';
         const socket = io();
         let selectedPlayer = null;
 
@@ -507,17 +531,26 @@
         }
 
         function handlePlayerClick(playerUsername, isInGame) {
-            if (isInGame) {
-                alert("Ce joueur est déjà en partie");
-                return;
-            }
+    if (isInGame) {
+        alert("Ce joueur est déjà en partie");
+        return;
+    }
 
-            selectedPlayer = { username: playerUsername };
-            const modal = document.getElementById('playerModal');
-            document.getElementById('modalPlayerName').textContent = playerUsername;
-            document.getElementById('requestGameBtn').onclick = requestGame;
-            modal.style.display = 'block';
-        }
+    selectedPlayer = { username: playerUsername };
+    const modal = document.getElementById('playerModal');
+    document.getElementById('modalPlayerName').textContent = playerUsername;
+    
+    // Utiliser currentUsername pour la comparaison
+    const requestGameBtn = document.getElementById('requestGameBtn');
+    if (playerUsername === currentUsername) {
+        requestGameBtn.style.display = 'none';
+    } else {
+        requestGameBtn.style.display = 'block';
+        requestGameBtn.onclick = requestGame;
+    }
+    
+    modal.style.display = 'block';
+}
 
         function closePlayerModal() {
             document.getElementById('playerModal').style.display = 'none';
@@ -547,6 +580,15 @@
             document.getElementById('matchRequest').style.display = 'none';
         }
 
+        // Après la création du socket, ajoutez :
+fetch('/check-session')
+    .then(response => response.json())
+    .then(data => {
+        if (data.authenticated) {
+            currentUsername = data.username;
+        }
+    });
+
         // Socket.io event listeners
         socket.on("connect", () => {
             console.log("Socket connecté, ID:", socket.id);
@@ -558,7 +600,6 @@
     const container = document.getElementById('online-players');
     const playerCount = document.getElementById('online-player-count');
     
-    // Mettre à jour le compteur sur le bouton
     playerCount.textContent = players ? players.length : 0;
 
     if (!players || players.length === 0) {
@@ -570,7 +611,10 @@
         .map(player => `
             <div class="player-card" onclick="handlePlayerClick('${player.username}', ${player.inGame})">
                 <div class="player-info">
-                    ${player.username} 
+                    <div class="player-name-country">
+                        <strong>${player.username}</strong>
+                        <span class="country-flag">${player.country ? `🌍 ${player.country}` : '🌍'}</span>
+                    </div>
                     ${player.inGame ? 
                         '<span class="status-in-game">(En partie)</span>' : 
                         '<span class="status-available">(Disponible)</span>'}
