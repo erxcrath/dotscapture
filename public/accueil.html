@@ -98,14 +98,15 @@
         }
 
         .game-container {
-            width: 90%;
-            max-width: 400px;
-            margin: auto;
-            padding: 20px;
-            background-color: rgb(0, 0, 0);
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
+    width: 90%;
+    max-width: 400px;
+    margin: 20px auto;  /* Ajout d'une marge fixe en haut */
+    padding: 20px;
+    background-color: rgb(0, 0, 0);
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    position: relative;  /* Ajout du positionnement relatif */
+}
 
         .game-logo {
             display: flex;
@@ -117,12 +118,22 @@
             order: -1;
         }
 
-        .buttons-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 20px;
-        }
+        .game-logo img {
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+    display: block;  /* Empêcher l'espace blanc sous l'image */
+    margin: 0 auto;  /* Centrer l'image */
+}
+
+.buttons-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 20px;
+    position: relative;  /* Ajout du positionnement relatif */
+    width: 100%;  /* Assurer la largeur complète */
+}
 
         .game-input {
             grid-column: 1 / -1;
