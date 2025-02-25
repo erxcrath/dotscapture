@@ -10,23 +10,23 @@ const bcrypt = require("bcryptjs");
 const bodyParser = require("body-parser"); // Ajout de cette ligne
 
 // Configuration de la base de données
-const dbConfig = {
+/*const dbConfig = {
   host: process.env.MYSQLHOST || "localhost",
   user: process.env.MYSQLUSER || "root",
   password: process.env.MYSQLPASSWORD || "",
   database: process.env.MYSQLDATABASE || "faritanyX",
   port: process.env.MYSQLPORT || 3306
 };
+*/
 
 
-
-/*const dbConfig = {
+const dbConfig = {
   host: "localhost",
   user: "root",
   password: "",
   database: "faritanyX",
   port: 3306,
-};*/
+};
 
 // Créer la connexion à la base de données
 const db = mysql.createConnection(dbConfig);
@@ -92,6 +92,21 @@ const createGamesHistoryTable = `
   );
 `;
 
+// Dans votre section de création de tables de la base de données (server.js)
+const createGlobalChatTable = `
+  CREATE TABLE IF NOT EXISTS global_chat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`;
+
+db.query(createGlobalChatTable, (err) => {
+  if (err) console.error("Erreur lors de la création de la table global_chat:", err);
+  else console.log("Table global_chat créée avec succès.");
+});
+
   db.query(createUsersTable, (err) => {
     if (err) {
       console.error("Erreur lors de la création de la table:", err);
@@ -114,6 +129,27 @@ db.on("error", (err) => {
     console.log("Tentative de reconnexion à la base de données...");
   }
 });
+
+// Exemple de fonction de nettoyage que vous pourriez exécuter périodiquement
+function cleanupOldMessages() {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  db.query(
+    'DELETE FROM global_chat WHERE timestamp < ?',
+    [thirtyDaysAgo],
+    (err, result) => {
+      if (err) {
+        console.error("Erreur lors du nettoyage des anciens messages:", err);
+      } else {
+        console.log(`${result.affectedRows} anciens messages supprimés.`);
+      }
+    }
+  );
+}
+
+// Exécuter ce nettoyage une fois par jour à minuit
+setInterval(cleanupOldMessages, 24 * 60 * 60 * 1000);
 
 // Garder une trace des joueurs en ligne
 const onlinePlayers = new Map();
@@ -259,7 +295,6 @@ app.get("/profile/:username", (req, res) => {
   res.sendFile(__dirname + "/public/profile.html");
 });
 
-// Remplacer la route API du profil par celle-ci
 app.get("/api/profile/:username", (req, res) => {
   const username = req.params.username;
   
@@ -272,21 +307,25 @@ app.get("/api/profile/:username", (req, res) => {
         console.error("Erreur lors de la récupération des données utilisateur:", err);
         return res.status(500).json({ error: "Erreur serveur" });
       }
+      
+      if (userData.length === 0) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
 
-      // Requête pour l'historique des matches avec les scores ELO
+      // Requête pour l'historique des matches avec tous les détails
       db.query(
         `SELECT 
-          gh.game_id,
-          gh.opponent_username,
-          gh.result,
-          gh.end_reason,
-          gh.created_at,
-          gh.player_elo_before,
-          gh.player_elo_after,
-          (gh.player_elo_after - gh.player_elo_before) as elo_change
-        FROM games_history gh
-        WHERE gh.player_username = ?
-        ORDER BY gh.created_at DESC 
+          game_id,
+          opponent_username,
+          result,
+          player_elo_before,
+          player_elo_after,
+          (player_elo_after - player_elo_before) as elo_change,
+          end_reason,
+          created_at
+        FROM games_history 
+        WHERE player_username = ?
+        ORDER BY created_at DESC 
         LIMIT 10`,
         [username],
         (err, matchHistory) => {
@@ -315,6 +354,7 @@ app.get("/api/profile/:username", (req, res) => {
     }
   );
 });
+
 
 app.get("/login", (req, res) => {
   res.sendFile(__dirname + "/public/login.html");
@@ -420,6 +460,8 @@ app.get("/debug-session", (req, res) => {
   });
 });
 
+// Ajouter cette variable pour stocker les messages du chat global
+
 // Attacher la session à Socket.IO
 io.use((socket, next) => {
   sessionMiddleware(socket.request, socket.request.res || {}, next);
@@ -476,6 +518,74 @@ io.on("connection", (socket) => {
       }
     }
   }
+
+  const globalChatMessages = [];
+const MAX_GLOBAL_MESSAGES = 50; // Limiter le nombre de messages stockés
+
+// Ajouter cette gestion d'événements socket pour le chat global
+socket.on('sendGlobalMessage', (message) => {
+  if (!socket.request.session?.username) return;
+  
+  const username = socket.request.session.username;
+  const text = message.trim();
+  
+  if (text.length === 0 || text.length > 150) return; // Validation basique
+  
+  // Insérer le message dans la base de données
+  db.query(
+    'INSERT INTO global_chat (username, message) VALUES (?, ?)',
+    [username, text],
+    (err, result) => {
+      if (err) {
+        console.error("Erreur lors de l'enregistrement du message:", err);
+        return;
+      }
+      
+      // Récupérer le message avec son ID et son timestamp
+      db.query(
+        'SELECT id, username, message, timestamp FROM global_chat WHERE id = ?',
+        [result.insertId],
+        (err, messageData) => {
+          if (err || !messageData.length) {
+            console.error("Erreur lors de la récupération du message:", err);
+            return;
+          }
+          
+          // Construire l'objet message
+          const newMessage = {
+            id: messageData[0].id,
+            username: messageData[0].username,
+            text: messageData[0].message,
+            timestamp: messageData[0].timestamp
+          };
+          
+          // Diffuser le message à tous les utilisateurs connectés
+          io.emit('globalChatMessage', newMessage);
+        }
+      );
+    }
+  );
+});
+// Ajouter cet événement pour récupérer l'historique des messages
+socket.on('getGlobalChatHistory', () => {
+  // Récupérer les 50 derniers messages
+  db.query(
+    'SELECT id, username, message AS text, timestamp FROM global_chat ORDER BY timestamp DESC LIMIT 50',
+    (err, messages) => {
+      if (err) {
+        console.error("Erreur lors de la récupération de l'historique des messages:", err);
+        socket.emit('globalChatHistory', []);
+        return;
+      }
+      
+      // Inverser l'ordre pour avoir les plus anciens en premier
+      messages.reverse();
+      
+      socket.emit('globalChatHistory', messages);
+    }
+  );
+});
+
 
   // Gestion des joueurs en ligne
   socket.on("requestOnlinePlayers", () => {
@@ -568,15 +678,14 @@ socket.on('abandonGame', async ({ gameId, player }) => {
 
           // Mettre à jour games_played en se basant sur games_history
           await queryAsync(`
-              UPDATE users u 
-              SET games_played = (
-                  SELECT COUNT(*) 
-                  FROM games_history 
-                  WHERE player_username = u.username
-                  OR opponent_username = u.username
-              )
-              WHERE username IN (?, ?)
-          `, [player1.username, player2.username]);
+            UPDATE users u 
+            SET games_played = (
+                SELECT COUNT(DISTINCT game_id) 
+                FROM games_history 
+                WHERE player_username = u.username
+            )
+            WHERE username IN (?, ?)
+        `, [player1.username, player2.username]);
 
           await queryAsync('COMMIT');
 
@@ -682,15 +791,14 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
 
           // Mettre à jour games_played en se basant sur games_history
           await queryAsync(`
-              UPDATE users u 
-              SET games_played = (
-                  SELECT COUNT(*) 
-                  FROM games_history 
-                  WHERE player_username = u.username
-                  OR opponent_username = u.username
-              )
-              WHERE username IN (?, ?)
-          `, [player1.username, player2.username]);
+            UPDATE users u 
+            SET games_played = (
+                SELECT COUNT(DISTINCT game_id) 
+                FROM games_history 
+                WHERE player_username = u.username
+            )
+            WHERE username IN (?, ?)
+        `, [player1.username, player2.username]);
 
           await queryAsync('COMMIT');
 
@@ -829,15 +937,14 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
           
               // Mettre à jour games_played APRÈS en se basant sur games_history
               await queryAsync(`
-                  UPDATE users u 
-                  SET games_played = (
-                      SELECT COUNT(*) 
-                      FROM games_history 
-                      WHERE player_username = u.username
-                      OR opponent_username = u.username
-                  )
-                  WHERE username IN (?, ?)
-              `, [player1.username, player2.username]);
+                UPDATE users u 
+                SET games_played = (
+                    SELECT COUNT(DISTINCT game_id) 
+                    FROM games_history 
+                    WHERE player_username = u.username
+                )
+                WHERE username IN (?, ?)
+            `, [player1.username, player2.username]);
           
               await queryAsync('COMMIT');
           
@@ -961,15 +1068,14 @@ async function handleGameEnd(gameId, winner, reason) {
  
           // Mettre à jour games_played en comptant à la fois comme joueur et comme adversaire
           await queryAsync(`
-              UPDATE users u 
-              SET games_played = (
-                  SELECT COUNT(*) 
-                  FROM games_history 
-                  WHERE player_username = u.username 
-                  OR opponent_username = u.username
-              )
-              WHERE username IN (?, ?)
-          `, [player1.username, player2.username]);
+            UPDATE users u 
+            SET games_played = (
+                SELECT COUNT(DISTINCT game_id) 
+                FROM games_history 
+                WHERE player_username = u.username
+            )
+            WHERE username IN (?, ?)
+        `, [player1.username, player2.username]);
  
           await queryAsync('COMMIT');
  
@@ -1319,24 +1425,9 @@ function queryAsync(sql, values) {
       io.to(gameId).emit("scoreUpdated", formattedGameState);
 
       // Gestion de la base de données pour les scores des joueurs
-      // Remplacer cette partie dans "updateScore"
-if (game.players.length === 2 && (scoreRed > 0 || scoreBlue > 0)) {
-  const winner = scoreRed > scoreBlue ? game.players[0] : game.players[1];
-  if (winner) {
-      const playerSocket = io.sockets.sockets.get(winner.id);
-      if (playerSocket?.request?.session?.username) {
-          // Uniquement mettre à jour le score, pas games_played
-          db.query(
-              "UPDATE users SET score = score + ? WHERE username = ?",
-              [1, playerSocket.request.session.username],
-              (err) => {
-                  if (err) console.error("Error updating winner score:", err);
-              }
-          );
-      }
-  }
-}
     }
+    
+    
   );
 
   // Ajouter un gestionnaire pour la mise à jour de l'état des timers

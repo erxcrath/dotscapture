@@ -7,65 +7,157 @@
     <title>Jeu de Points</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        .modal-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-top: 20px;
-        }
 
-        .modal-buttons button {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 400px;
+    margin-top: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+}
 
-        .profile-section {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-        }
+.chat-messages {
+    flex-grow: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin: 15px 0;
-        }
+.chat-message {
+    padding: 10px 15px;
+    border-radius: 8px;
+    max-width: 80%;
+    position: relative;
+}
 
-        .stat-card {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
+.my-message {
+    align-self: flex-end;
+    background-color: #4a90e2;
+    color: white;
+}
 
-        .stat-card h3 {
-            margin: 0;
-            color: #4a5568;
-            font-size: 14px;
-        }
+.other-message {
+    align-self: flex-start;
+    background-color: #e9e9eb;
+    color: #333;
+}
 
-        .stat-card p {
-            margin: 5px 0 0;
-            font-size: 24px;
-            font-weight: bold;
-            color: #2d3748;
-        }
+.message-header {
+    font-weight: bold;
+    font-size: 0.8em;
+    margin-bottom: 3px;
+}
 
-        .elo-history {
-            margin-top: 20px;
-        }
+.message-time {
+    font-size: 0.7em;
+    opacity: 0.7;
+    margin-top: 3px;
+    text-align: right;
+}
 
-        .matches-history {
-            margin-top: 20px;
-        }
+.message-text {
+    word-break: break-word;
+}
 
+.chat-input-container {
+    display: flex;
+    padding: 10px;
+    background-color: white;
+    border-top: 1px solid #ddd;
+}
+
+#globalChatInput {
+    flex-grow: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-right: 8px;
+}
+
+#sendGlobalMessage {
+    padding: 8px 16px;
+    background-color: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+#sendGlobalMessage:hover {
+    background-color: #3a80d2;
+}
+
+/* Personnalisation de la modal pour le chat */
+#chatModal .modal-content {
+    max-width: 600px;
+    width: 90%;
+}
+
+.modal-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.modal-buttons button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.profile-section {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.stat-card {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-card h3 {
+    margin: 0;
+    color: #4a5568;
+    font-size: 14px;
+}
+
+.stat-card p {
+    margin: 5px 0 0;
+    font-size: 24px;
+    font-weight: bold;
+    color: #2d3748;
+}
+
+.elo-history {
+    margin-top: 20px;
+}
+
+.matches-history {
+    margin-top: 20px;
+}
         .button-icon {
             margin-right: 8px;
             font-size: 18px;
@@ -98,15 +190,14 @@
         }
 
         .game-container {
-    width: 90%;
-    max-width: 400px;
-    margin: 20px auto;  /* Ajout d'une marge fixe en haut */
-    padding: 20px;
-    background-color: rgb(0, 0, 0);
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    position: relative;  /* Ajout du positionnement relatif */
-}
+            width: 90%;
+            max-width: 400px;
+
+            padding: 20px;
+            background-color: rgb(0, 0, 0);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
 
         .game-logo {
             display: flex;
@@ -118,22 +209,12 @@
             order: -1;
         }
 
-        .game-logo img {
-    width: 100%;
-    max-width: 400px;
-    height: auto;
-    display: block;  /* Empêcher l'espace blanc sous l'image */
-    margin: 0 auto;  /* Centrer l'image */
-}
-
-.buttons-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 20px;
-    position: relative;  /* Ajout du positionnement relatif */
-    width: 100%;  /* Assurer la largeur complète */
-}
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
 
         .game-input {
             grid-column: 1 / -1;
@@ -460,7 +541,8 @@
 <body>
     <div class="game-container">
         <div class="game-logo">
-            <img src="dotscapture3.jpg" alt="Dots Capture Logo" class="game-image">
+            <img src="dotscapture.jpg" alt="Dots Capture Logo" class="game-image">
+            <img src="dotscapture2.jpg" alt="Dots Capture Logo" class="game-image">
         </div>
 
         <div class="buttons-grid">
@@ -474,8 +556,8 @@
             <button onclick="showLeaderboard()" class="game-button">
                 <span class="button-icon">🏆</span>Classement
             </button>
-            <button onclick="showDiscord()" class="game-button">
-                <span class="button-icon">💬</span>Discord
+            <button onclick="showChat()" class="game-button">
+                <span class="button-icon">💬</span>Chat
             </button>
             <button onclick="window.location.href='/logout'" class="game-button-deconnexion">
                 <span class="button-icon">🚪</span>Déconnexion
@@ -514,10 +596,18 @@
             </table>
         </div>
     </div>
-    <div id="DiscordModal" class="modal">
-        <span class="close-button" onclick="hideDiscord()">&times;</span>
-        <h2><a href="https://discord.com/ccG6x7Cv">Chat General</a></h2>
-        <h2><a href="https://discord.com/">Participation à Dots Capture 's Legend of Africa</a></h2>
+    <div id="chatModal" class="modal">
+        <span class="close-button" onclick="hideChat()">&times;</span>
+        <h2>Chat Général</h2>
+        <div class="chat-container">
+            <div class="chat-messages" id="globalChatMessages">
+                <div class="loading-text">Chargement des messages...</div>
+            </div>
+            <div class="chat-input-container">
+                <input type="text" id="globalChatInput" placeholder="Entrez votre message..." maxlength="150">
+                <button id="sendGlobalMessage" onclick="sendGlobalMessage()">Envoyer</button>
+            </div>
+        </div>
     </div>
 
     <div id="playerModal" class="modal">
@@ -554,28 +644,6 @@
             }
         }
 
-        // Ajouter cette fonction dans votre script
-        function viewProfile() {
-            const username = document.getElementById('modalPlayerName').textContent;
-            window.location.href = `/profile/${username}`;
-        }
-
-        // Modifier la fonction handlePlayerClick
-        function handlePlayerClick(playerUsername, isInGame) {
-            selectedPlayer = { username: playerUsername };
-            const modal = document.getElementById('playerModal');
-            document.getElementById('modalPlayerName').textContent = playerUsername;
-
-            // Afficher/cacher le bouton de demande de match selon le statut
-            const requestGameBtn = document.getElementById('requestGameBtn');
-            const viewProfileBtn = document.getElementById('viewProfileBtn');
-
-            requestGameBtn.style.display = isInGame ? 'none' : 'block';
-            viewProfileBtn.style.display = 'block';
-
-            modal.style.display = 'block';
-        }
-
 
         // Gestion des modales
         function showPlayers() {
@@ -597,16 +665,102 @@
             document.getElementById('leaderboardModal').style.display = 'none';
             document.getElementById('modalBackdrop').style.display = 'none';
         }
-        function showDiscord() {
-            document.getElementById('DiscordModal').style.display = 'block';
-            document.getElementById('modalBackdrop').style.display = 'block';
-        }
+        function showChat() {
+    document.getElementById('chatModal').style.display = 'block';
+    document.getElementById('modalBackdrop').style.display = 'block';
+    // Récupérer l'historique des messages
+    socket.emit('getGlobalChatHistory');
+    // Mettre le focus sur le champ de saisie
+    setTimeout(() => {
+        document.getElementById('globalChatInput').focus();
+    }, 100);
+}
 
-        function hideDiscord() {
-            document.getElementById('DiscordModal').style.display = 'none';
-            document.getElementById('modalBackdrop').style.display = 'none';
-        }
+function hideChat() {
+    document.getElementById('chatModal').style.display = 'none';
+    document.getElementById('modalBackdrop').style.display = 'none';
+}
 
+function sendGlobalMessage() {
+    const input = document.getElementById('globalChatInput');
+    const message = input.value.trim();
+    
+    if (message) {
+        socket.emit('sendGlobalMessage', message);
+        input.value = '';
+        input.focus();
+    }
+}
+
+// Ajouter le gestionnaire d'événements pour la touche Entrée
+document.getElementById('globalChatInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        sendGlobalMessage();
+    }
+});
+
+// Recevoir les messages
+socket.on('globalChatMessage', function(message) {
+    displayGlobalMessage(message);
+});
+
+// Recevoir l'historique des messages
+socket.on('globalChatHistory', function(messages) {
+    const chatContainer = document.getElementById('globalChatMessages');
+    chatContainer.innerHTML = '';
+    
+    if (!messages || messages.length === 0) {
+        chatContainer.innerHTML = '<div class="loading-text">Aucun message. Soyez le premier à écrire !</div>';
+    } else {
+        messages.forEach(message => {
+            displayGlobalMessage(message);
+        });
+    }
+    
+    // Défilement vers le bas
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+});
+// Fonction pour afficher un message
+function displayGlobalMessage(message) {
+    const chatContainer = document.getElementById('globalChatMessages');
+    const loadingText = chatContainer.querySelector('.loading-text');
+    if (loadingText) {
+        chatContainer.removeChild(loadingText);
+    }
+    
+    const isMyMessage = message.username === currentUsername;
+    const messageClass = isMyMessage ? 'my-message' : 'other-message';
+    
+    const messageElement = document.createElement('div');
+    messageElement.className = `chat-message ${messageClass}`;
+    messageElement.dataset.messageId = message.id;
+    
+    // Gestion du format de date (compatible avec MySQL TIMESTAMP)
+    const time = new Date(message.timestamp);
+    const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    messageElement.innerHTML = `
+        <div class="message-header">${escapeHtml(message.username)}</div>
+        <div class="message-text">${escapeHtml(message.text)}</div>
+        <div class="message-time">${formattedTime}</div>
+    `;
+    
+    chatContainer.appendChild(messageElement);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+// Fonction d'échappement HTML pour sécuriser les messages
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+        function viewProfile() {
+            const username = document.getElementById('modalPlayerName').textContent;
+            window.location.href = `/profile/${username}`;
+        }
         function handlePlayerClick(playerUsername, isInGame) {
             if (isInGame) {
                 alert("Ce joueur est déjà en partie");
@@ -657,6 +811,14 @@
             document.getElementById('matchRequest').style.display = 'none';
         }
 
+
+        // Socket.io event listeners
+        socket.on("connect", () => {
+            console.log("Socket connecté, ID:", socket.id);
+            socket.emit("requestOnlinePlayers");
+            socket.emit("requestLeaderboard");
+        });
+
         // Après la création du socket, ajoutez :
         fetch('/check-session')
             .then(response => response.json())
@@ -665,13 +827,6 @@
                     currentUsername = data.username;
                 }
             });
-
-        // Socket.io event listeners
-        socket.on("connect", () => {
-            console.log("Socket connecté, ID:", socket.id);
-            socket.emit("requestOnlinePlayers");
-            socket.emit("requestLeaderboard");
-        });
 
         socket.on("updateOnlinePlayers", (players) => {
             const container = document.getElementById('online-players');
