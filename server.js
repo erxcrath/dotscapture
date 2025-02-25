@@ -9,24 +9,27 @@ const MySQLStore = require("express-mysql-session")(session);
 const bcrypt = require("bcryptjs");
 const bodyParser = require("body-parser"); // Ajout de cette ligne
 
+
+const lastSeenMessageIds = new Map(); // username -> messageId
 // Configuration de la base de données
-const dbConfig = {
+/*const dbConfig = {
   host: process.env.MYSQLHOST || "localhost",
   user: process.env.MYSQLUSER || "root",
   password: process.env.MYSQLPASSWORD || "",
   database: process.env.MYSQLDATABASE || "faritanyX",
   port: process.env.MYSQLPORT || 3306
 };
+*/
 
 
-/*
+
 const dbConfig = {
   host: "localhost",
   user: "root",
   password: "",
   database: "faritanyX",
   port: 3306,
-};*/
+};
 
 // Créer la connexion à la base de données
 const db = mysql.createConnection(dbConfig);
@@ -518,7 +521,44 @@ io.on("connection", (socket) => {
       }
     }
   }
+  socket.on('markMessagesAsRead', () => {
+    if (!socket.request.session?.username) return;
+    
+    const username = socket.request.session.username;
+    
+    // Obtenir l'ID du dernier message
+    db.query(
+      'SELECT MAX(id) as lastId FROM global_chat',
+      (err, result) => {
+        if (err || !result[0].lastId) return;
+        
+        lastSeenMessageIds.set(username, result[0].lastId);
+      }
+    );
+  });
+  
+  // Ajouter cette fonction pour envoyer le nombre de messages non lus
+  socket.on('getUnreadMessageCount', () => {
+    if (!socket.request.session?.username) return;
+    
+    const username = socket.request.session.username;
+    const lastSeenId = lastSeenMessageIds.get(username) || 0;
+    
+    db.query(
+      'SELECT COUNT(*) as count FROM global_chat WHERE id > ?',
+      [lastSeenId],
+      (err, result) => {
+        if (err) {
+          console.error("Erreur lors du comptage des messages non lus:", err);
+          return;
+        }
+        
+        socket.emit('unreadMessageCount', result[0].count);
+      }
+    );
+  });
 
+  
   const globalChatMessages = [];
 const MAX_GLOBAL_MESSAGES = 50; // Limiter le nombre de messages stockés
 

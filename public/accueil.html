@@ -7,157 +7,172 @@
     <title>Jeu de Points</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
+        .message-badge {
+            display: inline-block;
+            background-color: #ff3b30;
+            color: white;
+            border-radius: 50%;
+            min-width: 18px;
+            height: 18px;
+            line-height: 18px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 5px;
+            padding: 0 4px;
+        }
 
-.chat-container {
-    display: flex;
-    flex-direction: column;
-    height: 400px;
-    margin-top: 20px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    overflow: hidden;
-}
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 400px;
+            margin-top: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
 
-.chat-messages {
-    flex-grow: 1;
-    padding: 15px;
-    overflow-y: auto;
-    background-color: #f8f9fa;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
+        .chat-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
 
-.chat-message {
-    padding: 10px 15px;
-    border-radius: 8px;
-    max-width: 80%;
-    position: relative;
-}
+        .chat-message {
+            padding: 10px 15px;
+            border-radius: 8px;
+            max-width: 80%;
+            position: relative;
+        }
 
-.my-message {
-    align-self: flex-end;
-    background-color: #4a90e2;
-    color: white;
-}
+        .my-message {
+            align-self: flex-end;
+            background-color: #4a90e2;
+            color: white;
+        }
 
-.other-message {
-    align-self: flex-start;
-    background-color: #e9e9eb;
-    color: #333;
-}
+        .other-message {
+            align-self: flex-start;
+            background-color: #e9e9eb;
+            color: #333;
+        }
 
-.message-header {
-    font-weight: bold;
-    font-size: 0.8em;
-    margin-bottom: 3px;
-}
+        .message-header {
+            font-weight: bold;
+            font-size: 0.8em;
+            margin-bottom: 3px;
+        }
 
-.message-time {
-    font-size: 0.7em;
-    opacity: 0.7;
-    margin-top: 3px;
-    text-align: right;
-}
+        .message-time {
+            font-size: 0.7em;
+            opacity: 0.7;
+            margin-top: 3px;
+            text-align: right;
+        }
 
-.message-text {
-    word-break: break-word;
-}
+        .message-text {
+            word-break: break-word;
+        }
 
-.chat-input-container {
-    display: flex;
-    padding: 10px;
-    background-color: white;
-    border-top: 1px solid #ddd;
-}
+        .chat-input-container {
+            display: flex;
+            padding: 10px;
+            background-color: white;
+            border-top: 1px solid #ddd;
+        }
 
-#globalChatInput {
-    flex-grow: 1;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    margin-right: 8px;
-}
+        #globalChatInput {
+            flex-grow: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
 
-#sendGlobalMessage {
-    padding: 8px 16px;
-    background-color: #4a90e2;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.2s;
-}
+        #sendGlobalMessage {
+            padding: 8px 16px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
 
-#sendGlobalMessage:hover {
-    background-color: #3a80d2;
-}
+        #sendGlobalMessage:hover {
+            background-color: #3a80d2;
+        }
 
-/* Personnalisation de la modal pour le chat */
-#chatModal .modal-content {
-    max-width: 600px;
-    width: 90%;
-}
+        /* Personnalisation de la modal pour le chat */
+        #chatModal .modal-content {
+            max-width: 600px;
+            width: 90%;
+        }
 
-.modal-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: 20px;
-}
+        .modal-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
 
-.modal-buttons button {
-    width: 100%;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: all 0.3s ease;
-}
+        .modal-buttons button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
 
-.profile-section {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    margin: 20px 0;
-}
+        .profile-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
 
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 15px;
-    margin: 15px 0;
-}
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
 
-.stat-card {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 8px;
-    text-align: center;
-}
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
 
-.stat-card h3 {
-    margin: 0;
-    color: #4a5568;
-    font-size: 14px;
-}
+        .stat-card h3 {
+            margin: 0;
+            color: #4a5568;
+            font-size: 14px;
+        }
 
-.stat-card p {
-    margin: 5px 0 0;
-    font-size: 24px;
-    font-weight: bold;
-    color: #2d3748;
-}
+        .stat-card p {
+            margin: 5px 0 0;
+            font-size: 24px;
+            font-weight: bold;
+            color: #2d3748;
+        }
 
-.elo-history {
-    margin-top: 20px;
-}
+        .elo-history {
+            margin-top: 20px;
+        }
 
-.matches-history {
-    margin-top: 20px;
-}
+        .matches-history {
+            margin-top: 20px;
+        }
+
         .button-icon {
             margin-right: 8px;
             font-size: 18px;
@@ -556,8 +571,10 @@
             <button onclick="showLeaderboard()" class="game-button">
                 <span class="button-icon">🏆</span>Classement
             </button>
+            <!-- Remplacer le bouton chat existant par celui-ci -->
             <button onclick="showChat()" class="game-button">
                 <span class="button-icon">💬</span>Chat
+                <span id="unreadBadge" class="message-badge" style="display:none;">0</span>
             </button>
             <button onclick="window.location.href='/logout'" class="game-button-deconnexion">
                 <span class="button-icon">🚪</span>Déconnexion
@@ -615,7 +632,8 @@
             <span class="close-button" onclick="closePlayerModal()">&times;</span>
             <h2 id="modalPlayerName"></h2>
             <div class="modal-buttons">
-                <button id="requestGameBtn" class="game-button primary" onclick="requestGame()">Demander un match</button>
+                <button id="requestGameBtn" class="game-button primary" onclick="requestGame()">Demander un
+                    match</button>
                 <button id="viewProfileBtn" class="game-button" onclick="viewProfile()">Voir le profil</button>
             </div>
         </div>
@@ -631,6 +649,8 @@
 
     <script>
 
+        // Variables pour le suivi des messages
+        let unreadCount = 0;
         // Au début du script, ajoutez une variable pour stocker le username courant
         let currentUsername = '';
         const socket = io();
@@ -641,6 +661,17 @@
             const gameId = document.getElementById('gameId').value;
             if (gameId) {
                 socket.emit('joinGame', gameId);
+            }
+        }
+
+        // Fonction pour mettre à jour le badge de messages non lus
+        function updateUnreadBadge() {
+            const badge = document.getElementById('unreadBadge');
+            if (unreadCount > 0) {
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
             }
         }
 
@@ -666,97 +697,147 @@
             document.getElementById('modalBackdrop').style.display = 'none';
         }
         function showChat() {
-    document.getElementById('chatModal').style.display = 'block';
-    document.getElementById('modalBackdrop').style.display = 'block';
-    // Récupérer l'historique des messages
-    socket.emit('getGlobalChatHistory');
-    // Mettre le focus sur le champ de saisie
-    setTimeout(() => {
-        document.getElementById('globalChatInput').focus();
-    }, 100);
+            document.getElementById('chatModal').style.display = 'block';
+            document.getElementById('modalBackdrop').style.display = 'block';
+
+            // Récupérer l'historique
+            socket.emit('getGlobalChatHistory');
+
+            // Marquer les messages comme lus
+            socket.emit('markMessagesAsRead');
+            unreadCount = 0;
+            updateUnreadBadge();
+
+            setTimeout(() => {
+                document.getElementById('globalChatInput').focus();
+            }, 100);
+        }
+
+        function hideChat() {
+            document.getElementById('chatModal').style.display = 'none';
+            document.getElementById('modalBackdrop').style.display = 'none';
+        }
+
+        // Au moment de marquer les messages comme lus
+function markMessagesAsRead(lastMessageId) {
+    localStorage.setItem('lastSeenMessageId', lastMessageId);
+    socket.emit('markMessagesAsRead');
 }
 
-function hideChat() {
-    document.getElementById('chatModal').style.display = 'none';
-    document.getElementById('modalBackdrop').style.display = 'none';
-}
-
-function sendGlobalMessage() {
-    const input = document.getElementById('globalChatInput');
-    const message = input.value.trim();
-    
-    if (message) {
-        socket.emit('sendGlobalMessage', message);
-        input.value = '';
-        input.focus();
+// Au chargement de la page
+function initializeUnreadCounter() {
+    const lastSeen = localStorage.getItem('lastSeenMessageId');
+    if (lastSeen) {
+        // Envoyer cette information au serveur
+        socket.emit('setLastSeen', parseInt(lastSeen));
     }
 }
 
-// Ajouter le gestionnaire d'événements pour la touche Entrée
-document.getElementById('globalChatInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        sendGlobalMessage();
-    }
-});
+        function sendGlobalMessage() {
+            const input = document.getElementById('globalChatInput');
+            const message = input.value.trim();
 
-// Recevoir les messages
-socket.on('globalChatMessage', function(message) {
-    displayGlobalMessage(message);
-});
+            if (message) {
+                socket.emit('sendGlobalMessage', message);
+                input.value = '';
+                input.focus();
+            }
+        }
 
-// Recevoir l'historique des messages
-socket.on('globalChatHistory', function(messages) {
-    const chatContainer = document.getElementById('globalChatMessages');
-    chatContainer.innerHTML = '';
-    
-    if (!messages || messages.length === 0) {
-        chatContainer.innerHTML = '<div class="loading-text">Aucun message. Soyez le premier à écrire !</div>';
-    } else {
-        messages.forEach(message => {
+        // Ajouter le gestionnaire d'événements pour la touche Entrée
+        document.getElementById('globalChatInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendGlobalMessage();
+            }
+        });
+
+        // Recevoir les messages
+        socket.on('globalChatMessage', function (message) {
+            // Si le chat n'est pas ouvert, incrémenter le compteur
+            if (document.getElementById('chatModal').style.display !== 'block') {
+                unreadCount++;
+                updateUnreadBadge();
+            }
+
+            // Afficher le message comme avant
             displayGlobalMessage(message);
         });
-    }
-    
-    // Défilement vers le bas
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-});
-// Fonction pour afficher un message
-function displayGlobalMessage(message) {
-    const chatContainer = document.getElementById('globalChatMessages');
-    const loadingText = chatContainer.querySelector('.loading-text');
-    if (loadingText) {
-        chatContainer.removeChild(loadingText);
-    }
-    
-    const isMyMessage = message.username === currentUsername;
-    const messageClass = isMyMessage ? 'my-message' : 'other-message';
-    
-    const messageElement = document.createElement('div');
-    messageElement.className = `chat-message ${messageClass}`;
-    messageElement.dataset.messageId = message.id;
-    
-    // Gestion du format de date (compatible avec MySQL TIMESTAMP)
-    const time = new Date(message.timestamp);
-    const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    messageElement.innerHTML = `
+
+
+        socket.on('unreadMessageCount', function (count) {
+            unreadCount = count;
+            updateUnreadBadge();
+        });
+
+        // Demander le nombre de messages non lus au chargement de la page
+        document.addEventListener('DOMContentLoaded', function () {
+            // Attendre que la connexion socket soit établie
+            setTimeout(() => {
+                socket.emit('getUnreadMessageCount');
+            }, 1000);
+        });
+
+        // Mettre à jour le compteur périodiquement
+        setInterval(() => {
+            if (document.getElementById('chatModal').style.display !== 'block') {
+                socket.emit('getUnreadMessageCount');
+            }
+        }, 30000); // Toutes les 30 secondes
+
+
+        // Recevoir l'historique des messages
+        socket.on('globalChatHistory', function (messages) {
+            const chatContainer = document.getElementById('globalChatMessages');
+            chatContainer.innerHTML = '';
+
+            if (!messages || messages.length === 0) {
+                chatContainer.innerHTML = '<div class="loading-text">Aucun message. Soyez le premier à écrire !</div>';
+            } else {
+                messages.forEach(message => {
+                    displayGlobalMessage(message);
+                });
+            }
+
+            // Défilement vers le bas
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+        // Fonction pour afficher un message
+        function displayGlobalMessage(message) {
+            const chatContainer = document.getElementById('globalChatMessages');
+            const loadingText = chatContainer.querySelector('.loading-text');
+            if (loadingText) {
+                chatContainer.removeChild(loadingText);
+            }
+
+            const isMyMessage = message.username === currentUsername;
+            const messageClass = isMyMessage ? 'my-message' : 'other-message';
+
+            const messageElement = document.createElement('div');
+            messageElement.className = `chat-message ${messageClass}`;
+            messageElement.dataset.messageId = message.id;
+
+            // Gestion du format de date (compatible avec MySQL TIMESTAMP)
+            const time = new Date(message.timestamp);
+            const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            messageElement.innerHTML = `
         <div class="message-header">${escapeHtml(message.username)}</div>
         <div class="message-text">${escapeHtml(message.text)}</div>
         <div class="message-time">${formattedTime}</div>
     `;
-    
-    chatContainer.appendChild(messageElement);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-// Fonction d'échappement HTML pour sécuriser les messages
-function escapeHtml(text) {
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+
+            chatContainer.appendChild(messageElement);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        // Fonction d'échappement HTML pour sécuriser les messages
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
         function viewProfile() {
             const username = document.getElementById('modalPlayerName').textContent;
             window.location.href = `/profile/${username}`;
