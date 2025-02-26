@@ -92,8 +92,8 @@ function setup() {
     RED = "#ed2939";
     BLUE = "#4267B2";
     CYAN = "#cccccc";
-    LIGHT_RED = '#ffd7d7';
-    LIGHT_BLUE = '#d7d7ff';
+    LIGHT_RED = 'rgba(255, 112, 112, 0.3)';
+    LIGHT_BLUE = 'rgba(22, 96, 255, 0.3)';
     
     reddots = matrixArray(MAX_X, MAX_Y);
     bluedots = matrixArray(MAX_X, MAX_Y);
@@ -105,10 +105,10 @@ function setup() {
 
 function draw() {
     svgElement.innerHTML = '';
-    field();
-    drawShapesAndLines();
+    field();  // Dessiner d'abord la grille
+    drawShapesAndLines();  // Ensuite les outlines/contours
     for (let d of render) {
-        DotDisplay(d);
+        DotDisplay(d);  // Et enfin les points
     }
 }
 
@@ -168,7 +168,6 @@ function field() {
     // Ajouter la zone de départ centrale
     drawStartingZone();
 }
-
 function startTimers() {
     // Arrêter les timers existants si nécessaire
     if (activeTimer) clearInterval(activeTimer);
@@ -258,10 +257,10 @@ function drawShapesAndLines() {
         path.setAttribute("fill", outline[1].type === "red" ? LIGHT_RED : LIGHT_BLUE);
         path.setAttribute("stroke", outline[1].c);
         path.setAttribute("stroke-width", LINEWEIGHT);
+        path.setAttribute("opacity", "0.9"); // Rendre les contours légèrement transparents pour voir la grille en-dessous
         svgElement.appendChild(path);
     }
 }
-
 // Gestion des événements souris
 function mouseDragged(event) {
     const rect = svgElement.getBoundingClientRect();
@@ -470,13 +469,13 @@ function applyPathfinding(newdot) {
                 path[i].outline = outlines.length;
             }
             outlines.push(path);
-            // Ne pas mettre à jour updateScore() ici
         }
     }
     // Appeler updateScore une seule fois après toutes les captures
     updateScore();
 }
 
+// Modification de isAppropriate pour préserver les outlines lors des captures en cascade
 function isAppropriate(path) {
     if (!path || path.length < 3) return false;
 
@@ -517,6 +516,7 @@ function isAppropriate(path) {
                 reverse_typedots[j][i].captured = false;
                 if (reverse_typedots[j][i].type == "red") scoreBlue--;
                 else scoreRed--;
+                // Ne pas supprimer l'outline associée
             } else if (typedots[j][i] && !typedots[j][i].captured) {
                 typedots[j][i].captured = true;
                 if (typedots[j][i].type == "red") scoreBlue++;
@@ -531,7 +531,6 @@ function isAppropriate(path) {
     }
     return flag;
 }
-
 // Classe Pathfinder
 class Pathfinder {
     constructor(start) {

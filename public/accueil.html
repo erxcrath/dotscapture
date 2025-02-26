@@ -648,6 +648,9 @@
 
     <script>
 
+        // Ajouter cette variable au début de votre script pour garder une trace des joueurs en ligne
+let onlinePlayersData = [];
+
         // Variables pour le suivi des messages
         let unreadCount = 0;
         // Au début du script, ajoutez une variable pour stocker le username courant
@@ -842,26 +845,37 @@ function initializeUnreadCounter() {
             window.location.href = `/profile/${username}`;
         }
         function handlePlayerClick(playerUsername, isInGame) {
-            if (isInGame) {
-                alert("Ce joueur est déjà en partie");
-                return;
-            }
+    selectedPlayer = { 
+        username: playerUsername,
+        isOnline: true,  // Si appelé depuis la liste des joueurs en ligne, le joueur est forcément en ligne
+        inGame: isInGame
+    };
+    
+    const modal = document.getElementById('playerModal');
+    document.getElementById('modalPlayerName').textContent = playerUsername;
 
-            selectedPlayer = { username: playerUsername };
-            const modal = document.getElementById('playerModal');
-            document.getElementById('modalPlayerName').textContent = playerUsername;
-
-            // Utiliser currentUsername pour la comparaison
-            const requestGameBtn = document.getElementById('requestGameBtn');
-            if (playerUsername === currentUsername) {
-                requestGameBtn.style.display = 'none';
-            } else {
-                requestGameBtn.style.display = 'block';
-                requestGameBtn.onclick = requestGame;
-            }
-
-            modal.style.display = 'block';
+    // Utiliser currentUsername pour la comparaison
+    const requestGameBtn = document.getElementById('requestGameBtn');
+    if (playerUsername === currentUsername) {
+        requestGameBtn.style.display = 'none';
+    } else {
+        requestGameBtn.style.display = 'block';
+        
+        // Désactiver le bouton si le joueur est en partie
+        if (isInGame) {
+            requestGameBtn.disabled = true;
+            requestGameBtn.classList.add('disabled');
+            requestGameBtn.title = 'Joueur en partie';
+        } else {
+            requestGameBtn.disabled = false;
+            requestGameBtn.classList.remove('disabled');
+            requestGameBtn.title = '';
         }
+    }
+
+    modal.style.display = 'block';
+    document.getElementById('modalBackdrop').style.display = 'block';
+}
 
         function closePlayerModal() {
             document.getElementById('playerModal').style.display = 'none';
@@ -869,11 +883,29 @@ function initializeUnreadCounter() {
         }
 
         function requestGame() {
-            if (selectedPlayer) {
-                socket.emit('requestMatch', { toPlayer: selectedPlayer.username });
-                closePlayerModal();
-            }
-        }
+    if (!selectedPlayer) return;
+    
+    // Vérifier si le joueur est en ligne avant d'envoyer la demande
+    if (!selectedPlayer.isOnline) {
+        alert("Ce joueur n'est pas en ligne actuellement.");
+        return;
+    }
+    
+    socket.emit('requestMatch', { toPlayer: selectedPlayer.username });
+    closePlayerModal();
+}
+
+// Ajouter ce style CSS pour les boutons désactivés
+const styleDisabled = document.createElement('style');
+styleDisabled.textContent = `
+    .game-button.disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background-color: #f3f3f3;
+        color: #999;
+    }
+`;
+document.head.appendChild(styleDisabled);
 
         function showMatchRequest(fromPlayer) {
             const requestText = document.getElementById('requestText');
@@ -890,6 +922,58 @@ function initializeUnreadCounter() {
             socket.emit('declineMatch');
             document.getElementById('matchRequest').style.display = 'none';
         }
+
+        // Ajouter cette nouvelle fonction pour gérer les clics sur les joueurs du classement
+        function handleLeaderboardPlayerClick(playerUsername) {
+    // Vérifier si le joueur est en ligne et en partie en utilisant les données stockées
+    const onlinePlayer = onlinePlayersData.find(p => p.username === playerUsername);
+    const isOnline = !!onlinePlayer;
+    const isInGame = isOnline && onlinePlayer.inGame;
+    
+    // Si le joueur n'est pas en ligne, nous afficherons quand même les options
+    // mais désactiverons le bouton "Demander un match"
+    selectedPlayer = { 
+        username: playerUsername,
+        isOnline: isOnline
+    };
+    
+    const modal = document.getElementById('playerModal');
+    document.getElementById('modalPlayerName').textContent = playerUsername;
+
+    // Utiliser currentUsername pour la comparaison
+    const requestGameBtn = document.getElementById('requestGameBtn');
+    if (playerUsername === currentUsername) {
+        requestGameBtn.style.display = 'none';
+    } else {
+        requestGameBtn.style.display = 'block';
+        
+        // Désactiver le bouton si le joueur n'est pas en ligne ou est en partie
+        if (!isOnline || isInGame) {
+            requestGameBtn.disabled = true;
+            requestGameBtn.classList.add('disabled');
+            requestGameBtn.title = !isOnline ? 'Joueur hors ligne' : 'Joueur en partie';
+        } else {
+            requestGameBtn.disabled = false;
+            requestGameBtn.classList.remove('disabled');
+            requestGameBtn.title = '';
+        }
+    }
+
+    modal.style.display = 'block';
+    document.getElementById('modalBackdrop').style.display = 'block';
+}
+// Ajouter ce style CSS pour indiquer que les lignes du tableau sont cliquables
+const style = document.createElement('style');
+style.textContent = `
+    .player-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .player-row:hover {
+        background-color: #f0f7ff;
+    }
+`;
+document.head.appendChild(style);
 
 
         // Socket.io event listeners
@@ -908,73 +992,110 @@ function initializeUnreadCounter() {
                 }
             });
 
-        socket.on("updateOnlinePlayers", (players) => {
-            const container = document.getElementById('online-players');
-            const playerCount = document.getElementById('online-player-count');
+            socket.on("updateOnlinePlayers", (players) => {
+    // Stocker les données des joueurs pour un accès global
+    onlinePlayersData = players || [];
+    
+    const container = document.getElementById('online-players');
+    const playerCount = document.getElementById('online-player-count');
 
-            // Mettre à jour le compteur sur le bouton
-            playerCount.textContent = players ? players.length : 0;
+    // Mettre à jour le compteur sur le bouton
+    playerCount.textContent = players ? players.length : 0;
 
-            if (!players || players.length === 0) {
-                container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
-                return;
-            }
+    if (!players || players.length === 0) {
+        container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
+        return;
+    }
 
-            container.innerHTML = players
-                .map(player => `
-            <div class="player-card" onclick="handlePlayerClick('${player.username}', ${player.inGame})">
-                <div class="player-info">
-                    ${player.username} 
-                    ${player.inGame ?
-                        '<span class="status-in-game">(En partie)</span>' :
-                        '<span class="status-available">(Disponible)</span>'}
-                </div>
+    container.innerHTML = players
+        .map(player => `
+        <div class="player-card" onclick="handlePlayerClick('${player.username}', ${player.inGame})">
+            <div class="player-info">
+                ${player.username} 
+                ${player.inGame ?
+                    '<span class="status-in-game">(En partie)</span>' :
+                    '<span class="status-available">(Disponible)</span>'}
             </div>
-        `).join('');
+        </div>
+    `).join('');
 
-            document.querySelector('#playersModal h2').textContent =
-                `Joueurs en ligne (${players.length})`;
-        });
+    document.querySelector('#playersModal h2').textContent =
+        `Joueurs en ligne (${players.length})`;
+});
 
-        socket.on('updateLeaderboard', (leaderboard) => {
-            const tbody = document.getElementById('leaderboard');
+socket.on('updateLeaderboard', (leaderboard) => {
+    const tbody = document.getElementById('leaderboard');
 
-            if (!leaderboard || leaderboard.length === 0) {
-                tbody.innerHTML = `
-            <tr>
-                <td colspan="4" class="loading-text">Aucune donnée disponible</td>
-            </tr>`;
-                return;
+    if (!leaderboard || leaderboard.length === 0) {
+        tbody.innerHTML = `
+        <tr>
+            <td colspan="4" class="loading-text">Aucune donnée disponible</td>
+        </tr>`;
+        return;
+    }
+
+    tbody.innerHTML = leaderboard
+        .map((player, index) => {
+            // Définir l'icône ou le numéro en fonction du rang
+            let rankDisplay;
+            switch (index) {
+                case 0:
+                    rankDisplay = '<span class="rank-icon">🏆</span>';
+                    break;
+                case 1:
+                    rankDisplay = '<span class="rank-icon">🥈</span>';
+                    break;
+                case 2:
+                    rankDisplay = '<span class="rank-icon">🥉</span>';
+                    break;
+                default:
+                    rankDisplay = `<span class="rank-number">${index + 1}</span>`;
             }
 
-            tbody.innerHTML = leaderboard
-                .map((player, index) => {
-                    // Définir l'icône ou le numéro en fonction du rang
-                    let rankDisplay;
-                    switch (index) {
-                        case 0:
-                            rankDisplay = '<span class="rank-icon">🏆</span>';
-                            break;
-                        case 1:
-                            rankDisplay = '<span class="rank-icon">🥈</span>';
-                            break;
-                        case 2:
-                            rankDisplay = '<span class="rank-icon">🥉</span>';
-                            break;
-                        default:
-                            rankDisplay = `<span class="rank-number">${index + 1}</span>`;
-                    }
+            // Vérifier si le joueur est en ligne
+            const isOnline = onlinePlayersData.some(p => p.username === player.username);
+            const onlineIndicator = isOnline 
+                ? '<span class="online-indicator" title="En ligne"></span>' 
+                : '';
 
-                    return `
-                <tr>
-                    <td>${rankDisplay}</td>
-                    <td>${player.username}</td>
-                    <td>${player.score || 0}</td>
-                    <td>${player.games_played || 0}</td>
-                </tr>
-            `;
-                }).join('');
-        });
+            // Rendre la ligne cliquable
+            return `
+            <tr class="player-row" onclick="handleLeaderboardPlayerClick('${player.username}')">
+                <td>${rankDisplay}</td>
+                <td>${player.username} ${onlineIndicator}</td>
+                <td>${player.score || 0}</td>
+                <td>${player.games_played || 0}</td>
+            </tr>
+        `;
+        }).join('');
+});
+
+// Ajouter ce style CSS pour l'indicateur en ligne
+const styleOnlineIndicator = document.createElement('style');
+styleOnlineIndicator.textContent = `
+    .online-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: #4CAF50;
+        border-radius: 50%;
+        margin-left: 8px;
+        position: relative;
+        top: -1px;
+    }
+    
+    /* Animation de pulsation (optionnelle) */
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    
+    .online-indicator {
+        animation: pulse 2s infinite;
+    }
+`;
+document.head.appendChild(styleOnlineIndicator);
 
         socket.on('matchRequest', (data) => {
             showMatchRequest(data.fromPlayer);
