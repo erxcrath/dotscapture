@@ -212,28 +212,36 @@ function field() {
     drawStartingZone();
 }
 function startTimers() {
-    // Arrêter les timers existants si nécessaire
+    // Arrêter les timers existants si nécessaires
     if (activeTimer) clearInterval(activeTimer);
     if (reflectionTimer) clearInterval(reflectionTimer);
     
-    isReflectionPhase = true;
-    commonReflectionTime = 30; // Réinitialiser le temps de réflexion commun
+    // Ne pas réinitialiser si c'est une reconnexion
+    const isReconnecting = sessionStorage.getItem('isReconnecting') === 'true';
     
-    // Démarrer le timer de réflexion commun
-    reflectionTimer = setInterval(() => {
-        if (commonReflectionTime > 0) {
-            commonReflectionTime--;
-            updateTimerDisplay();
-            emitTimerUpdate();
-        } else {
-            // Quand le temps de réflexion est écoulé, passer au temps principal
-            isReflectionPhase = false;
-            clearInterval(reflectionTimer);
-            startMainTimer();
-        }
-    }, 1000);
+    if (!isReconnecting) {
+        isReflectionPhase = true;
+        commonReflectionTime = 30; // Réinitialiser le temps de réflexion commun
+    }
+    
+    // Démarrer le timer approprié
+    if (isReflectionPhase) {
+        reflectionTimer = setInterval(() => {
+            if (commonReflectionTime > 0) {
+                commonReflectionTime--;
+                updateTimerDisplay();
+                emitTimerUpdate();
+            } else {
+                // Quand le temps de réflexion est écoulé, passer au temps principal
+                isReflectionPhase = false;
+                clearInterval(reflectionTimer);
+                startMainTimer();
+            }
+        }, 1000);
+    } else {
+        startMainTimer();
+    }
 }
-
 function startMainTimer() {
     activeTimer = setInterval(() => {
         if (currentTurn === 'player1') {
@@ -808,41 +816,35 @@ socket.on('gameJoined', (data) => {
     myPlayerType = data.playerType;
     currentTurn = data.gameState.currentTurn;
     
-    // Mettre à jour les noms des joueurs
-    if (data.gameState.player1Name) {
-      document.getElementById('player1Name').textContent = data.gameState.player1Name;
-    }
-    if (data.gameState.player2Name) {
-      document.getElementById('player2Name').textContent = data.gameState.player2Name;
+    // Si les timers sont présents dans l'état du jeu, utilisez-les
+    if (data.gameState.timers) {
+        player1Time = data.gameState.timers.player1Time;
+        player2Time = data.gameState.timers.player2Time;
+        commonReflectionTime = data.gameState.timers.commonReflectionTime;
+        isReflectionPhase = data.gameState.timers.isReflectionPhase;
     }
     
-    // Assurez-vous de prendre en compte l'état des timers
-    if (data.gameState.timers) {
-      // Utilisez explicitement les valeurs reçues
-      player1Time = data.gameState.timers.player1Time;
-      player2Time = data.gameState.timers.player2Time;
-      commonReflectionTime = data.gameState.timers.commonReflectionTime;
-      isReflectionPhase = data.gameState.timers.isReflectionPhase;
-      
-      // Arrêtez les timers existants et redémarrez avec les bonnes valeurs
-      if (activeTimer) clearInterval(activeTimer);
-      if (reflectionTimer) clearInterval(reflectionTimer);
-      
-      // Redémarrer le bon timer selon l'état actuel
-      if (isReflectionPhase) {
-        reflectionTimer = setInterval(() => {
-          // logique du timer de réflexion
-        }, 1000);
-      } else {
-        startMainTimer(); // Démarrer le timer principal avec les valeurs actuelles
-      }
+    // Mettre à jour les noms des joueurs
+    if (data.gameState.player1Name) {
+        document.getElementById('player1Name').textContent = data.gameState.player1Name;
+    }
+    if (data.gameState.player2Name) {
+        document.getElementById('player2Name').textContent = data.gameState.player2Name;
     }
     
     handleGameState(data.gameState);
     
-    updateTimerDisplay(); // Mettre à jour l'affichage des timers
-  });
-
+    // Mise à jour des affichages avant de démarrer les timers
+    updateTimerDisplay();
+    
+    // Pour une nouvelle partie, startTimers() sera appelé via gameStart
+    // Pour une reconnexion, démarrer les timers si nécessaire
+    if (sessionStorage.getItem('isReconnecting') === 'true') {
+        startTimers();
+        // Réinitialiser le flag après usage
+        sessionStorage.removeItem('isReconnecting');
+    }
+});
   
 socket.on('gameStart', (gameState) => {
     player1HasPlayed = false;
@@ -854,8 +856,13 @@ socket.on('gameStart', (gameState) => {
     if (gameState.player2Name) {
         document.getElementById('player2Name').textContent = gameState.player2Name;
     }
-    startTimers();
+    
+    // Démarrer les timers seulement si ce n'est pas une reconnexion
+    if (sessionStorage.getItem('isReconnecting') !== 'true') {
+        startTimers();
+    }
 });
+
 
 socket.on('dotPlaced', (data) => {
     let newDot = new Dot(data.type === 'player1' ? 1 : 2, data.x, data.y);
@@ -953,20 +960,26 @@ socket.on('connect', () => {
     const spectatingGameId = localStorage.getItem('spectatingGameId');
     const storedGameId = localStorage.getItem('gameId');
     
+    // Si on a déjà un gameId stocké, c'est une reconnexion
+    if (storedGameId || spectatingGameId) {
+        sessionStorage.setItem('isReconnecting', 'true');
+    }
+    
     // Priorité au mode spectateur
     if (spectatingGameId) {
         console.log("Rejoindre en tant que spectateur:", spectatingGameId);
         gameId = spectatingGameId;
-        isSpectator = true; // Important: définir le mode spectateur ici
+        isSpectator = true; 
         socket.emit('spectateGame', spectatingGameId);
     } 
     else if (storedGameId) {
         console.log("Rejoindre en tant que joueur:", storedGameId);
         gameId = storedGameId;
-        isSpectator = false; // S'assurer qu'on n'est pas en mode spectateur
+        isSpectator = false;
         socket.emit('joinGame', storedGameId);
     }
 });
+
 
 socket.on('disconnect', () => {
     console.log('Socket disconnected - attempting reconnection...');

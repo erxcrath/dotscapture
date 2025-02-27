@@ -1,4 +1,4 @@
-require('dotenv').config();
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const http = require("http").createServer(app);
@@ -9,27 +9,24 @@ const MySQLStore = require("express-mysql-session")(session);
 const bcrypt = require("bcryptjs");
 const bodyParser = require("body-parser"); // Ajout de cette ligne
 
-
 const lastSeenMessageIds = new Map(); // username -> messageId
 // Configuration de la base de données
-const dbConfig = {
+/*const dbConfig = {
   host: process.env.MYSQLHOST || "localhost",
   user: process.env.MYSQLUSER || "root",
   password: process.env.MYSQLPASSWORD || "",
   database: process.env.MYSQLDATABASE || "faritanyX",
   port: process.env.MYSQLPORT || 3306
 };
+*/
 
-
-
-/*
 const dbConfig = {
   host: "localhost",
   user: "root",
   password: "",
   database: "faritanyX",
   port: 3306,
-};*/
+};
 
 // Créer la connexion à la base de données
 const db = mysql.createConnection(dbConfig);
@@ -80,7 +77,7 @@ db.connect((err) => {
   );
 `;
 
-const createGamesHistoryTable = `
+  const createGamesHistoryTable = `
   CREATE TABLE IF NOT EXISTS games_history (
     id INT(11) NOT NULL AUTO_INCREMENT,
     game_id VARCHAR(255) NOT NULL,
@@ -95,8 +92,8 @@ const createGamesHistoryTable = `
   );
 `;
 
-// Dans votre section de création de tables de la base de données (server.js)
-const createGlobalChatTable = `
+  // Dans votre section de création de tables de la base de données (server.js)
+  const createGlobalChatTable = `
   CREATE TABLE IF NOT EXISTS global_chat (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) NOT NULL,
@@ -105,10 +102,11 @@ const createGlobalChatTable = `
   );
 `;
 
-db.query(createGlobalChatTable, (err) => {
-  if (err) console.error("Erreur lors de la création de la table global_chat:", err);
-  else console.log("Table global_chat créée avec succès.");
-});
+  db.query(createGlobalChatTable, (err) => {
+    if (err)
+      console.error("Erreur lors de la création de la table global_chat:", err);
+    else console.log("Table global_chat créée avec succès.");
+  });
 
   db.query(createUsersTable, (err) => {
     if (err) {
@@ -118,11 +116,14 @@ db.query(createGlobalChatTable, (err) => {
     console.log("Table users vérifiée/créée");
   });
 
-
-db.query(createGamesHistoryTable, (err) => {
-  if (err) console.error("Erreur lors de la création de la table games_history:", err);
-  else console.log("Table games_history créée avec succès.");
-});
+  db.query(createGamesHistoryTable, (err) => {
+    if (err)
+      console.error(
+        "Erreur lors de la création de la table games_history:",
+        err
+      );
+    else console.log("Table games_history créée avec succès.");
+  });
 });
 
 // Gestion des erreurs de connexion
@@ -137,9 +138,9 @@ db.on("error", (err) => {
 function cleanupOldMessages() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
+
   db.query(
-    'DELETE FROM global_chat WHERE timestamp < ?',
+    "DELETE FROM global_chat WHERE timestamp < ?",
     [thirtyDaysAgo],
     (err, result) => {
       if (err) {
@@ -263,7 +264,6 @@ app.post("/login", (req, res) => {
   }
 });
 
-
 app.get("/accueil", (req, res) => {
   console.log("Tentative d'accès à /accueil");
   console.log("Session:", req.session);
@@ -293,24 +293,27 @@ app.get("/profile/:username", (req, res) => {
   if (!req.session || !req.session.loggedin) {
     return res.redirect("/login");
   }
-  
+
   const username = req.params.username;
   res.sendFile(__dirname + "/public/profile.html");
 });
 
 app.get("/api/profile/:username", (req, res) => {
   const username = req.params.username;
-  
+
   // Requête pour les données utilisateur
   db.query(
     "SELECT username, score, games_played FROM users WHERE username = ?",
     [username],
     (err, userData) => {
       if (err) {
-        console.error("Erreur lors de la récupération des données utilisateur:", err);
+        console.error(
+          "Erreur lors de la récupération des données utilisateur:",
+          err
+        );
         return res.status(500).json({ error: "Erreur serveur" });
       }
-      
+
       if (userData.length === 0) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
       }
@@ -333,24 +336,32 @@ app.get("/api/profile/:username", (req, res) => {
         [username],
         (err, matchHistory) => {
           if (err) {
-            console.error("Erreur lors de la récupération de l'historique:", err);
+            console.error(
+              "Erreur lors de la récupération de l'historique:",
+              err
+            );
             return res.status(500).json({ error: "Erreur serveur" });
           }
 
           const stats = {
             totalGames: userData[0].games_played,
-            wins: matchHistory.filter(match => match.result === 1).length,
-            losses: matchHistory.filter(match => match.result === 0).length,
+            wins: matchHistory.filter((match) => match.result === 1).length,
+            losses: matchHistory.filter((match) => match.result === 0).length,
             currentElo: userData[0].score,
-            winRate: userData[0].games_played > 0 
-              ? Math.round((matchHistory.filter(match => match.result === 1).length / userData[0].games_played) * 100)
-              : 0
+            winRate:
+              userData[0].games_played > 0
+                ? Math.round(
+                    (matchHistory.filter((match) => match.result === 1).length /
+                      userData[0].games_played) *
+                      100
+                  )
+                : 0,
           };
 
           res.json({
             user: userData[0],
             stats,
-            matchHistory
+            matchHistory,
           });
         }
       );
@@ -359,17 +370,17 @@ app.get("/api/profile/:username", (req, res) => {
 });
 
 // Ajoutez une route pour récupérer les parties en cours
-app.get('/api/active-games', (req, res) => {
+app.get("/api/active-games", (req, res) => {
   if (!req.session || !req.session.loggedin) {
-    return res.status(401).json({ error: 'Non authentifié' });
+    return res.status(401).json({ error: "Non authentifié" });
   }
-  
+
   const activeGames = [];
-  
+
   for (const [gameId, game] of Object.entries(games)) {
     // Ne pas inclure les parties privées
     if (!game.gameState.isPublic) continue;
-    
+
     // S'assurer qu'il y a au moins 2 joueurs (partie en cours)
     if (game.players.length >= 2) {
       activeGames.push({
@@ -379,14 +390,13 @@ app.get('/api/active-games', (req, res) => {
         scoreRed: game.gameState.scoreRed,
         scoreBlue: game.gameState.scoreBlue,
         spectatorCount: game.spectators.length,
-        inProgress: true
+        inProgress: true,
       });
     }
   }
-  
+
   res.json(activeGames);
 });
-
 
 app.get("/login", (req, res) => {
   res.sendFile(__dirname + "/public/login.html");
@@ -550,65 +560,66 @@ io.on("connection", (socket) => {
       }
     }
   }
-  socket.on('markMessagesAsRead', () => {
+  socket.on("markMessagesAsRead", () => {
     if (!socket.request.session?.username) return;
-    
+
     const username = socket.request.session.username;
-    
+
     // Obtenir l'ID du dernier message
-    db.query(
-      'SELECT MAX(id) as lastId FROM global_chat',
-      (err, result) => {
-        if (err || !result[0].lastId) return;
-        
-        lastSeenMessageIds.set(username, result[0].lastId);
-      }
-    );
+    db.query("SELECT MAX(id) as lastId FROM global_chat", (err, result) => {
+      if (err || !result[0].lastId) return;
+
+      lastSeenMessageIds.set(username, result[0].lastId);
+    });
   });
-  
-  socket.on('spectateGame', (gameId) => {
-    console.log(`Utilisateur ${socket.request.session.username} tente de rejoindre la partie ${gameId} en tant que spectateur`);
-    
+
+  socket.on("spectateGame", (gameId) => {
+    console.log(
+      `Utilisateur ${socket.request.session.username} tente de rejoindre la partie ${gameId} en tant que spectateur`
+    );
+
     if (!socket.request.session?.loggedin) {
-      socket.emit('notAuthenticated');
+      socket.emit("notAuthenticated");
       return;
     }
-    
+
     if (!games[gameId]) {
-      socket.emit('gameNotFound');
+      socket.emit("gameNotFound");
       return;
     }
-    
+
     const game = games[gameId];
     const username = socket.request.session.username;
-    
+
     // Vérifier si l'utilisateur est déjà un spectateur
-    const existingSpectator = game.spectators.find(s => s.username === username);
+    const existingSpectator = game.spectators.find(
+      (s) => s.username === username
+    );
     if (existingSpectator) {
       existingSpectator.socketId = socket.id;
     } else {
       // Ajouter l'utilisateur aux spectateurs
-      game.spectators.push({ 
+      game.spectators.push({
         username: username,
-        socketId: socket.id 
+        socketId: socket.id,
       });
-      
+
       // Notifier les joueurs et autres spectateurs qu'un nouveau spectateur a rejoint
-      io.to(gameId).emit('spectatorJoined', {
+      io.to(gameId).emit("spectatorJoined", {
         spectatorCount: game.spectators.length,
-        username: username
+        username: username,
       });
     }
-    
+
     // Rejoindre la room Socket.IO pour cette partie
     socket.join(gameId);
-    
+
     // Envoyer l'état actuel du jeu au spectateur
-    socket.emit('gameSpectated', {
+    socket.emit("gameSpectated", {
       gameState: game.gameState,
-      gameId: gameId
+      gameId: gameId,
     });
-    
+
     // Mettre à jour le joueur comme étant en ligne mais pas "en partie"
     if (onlinePlayers.has(socket.id)) {
       const player = onlinePlayers.get(socket.id);
@@ -618,96 +629,96 @@ io.on("connection", (socket) => {
     }
   });
 
-
   // Ajouter cette fonction pour envoyer le nombre de messages non lus
-  socket.on('getUnreadMessageCount', () => {
+  socket.on("getUnreadMessageCount", () => {
     if (!socket.request.session?.username) return;
-    
+
     const username = socket.request.session.username;
     const lastSeenId = lastSeenMessageIds.get(username) || 0;
-    
+
     db.query(
-      'SELECT COUNT(*) as count FROM global_chat WHERE id > ?',
+      "SELECT COUNT(*) as count FROM global_chat WHERE id > ?",
       [lastSeenId],
       (err, result) => {
         if (err) {
           console.error("Erreur lors du comptage des messages non lus:", err);
           return;
         }
-        
-        socket.emit('unreadMessageCount', result[0].count);
+
+        socket.emit("unreadMessageCount", result[0].count);
       }
     );
   });
 
-  
   const globalChatMessages = [];
-const MAX_GLOBAL_MESSAGES = 50; // Limiter le nombre de messages stockés
+  const MAX_GLOBAL_MESSAGES = 50; // Limiter le nombre de messages stockés
 
-// Ajouter cette gestion d'événements socket pour le chat global
-socket.on('sendGlobalMessage', (message) => {
-  if (!socket.request.session?.username) return;
-  
-  const username = socket.request.session.username;
-  const text = message.trim();
-  
-  if (text.length === 0 || text.length > 150) return; // Validation basique
-  
-  // Insérer le message dans la base de données
-  db.query(
-    'INSERT INTO global_chat (username, message) VALUES (?, ?)',
-    [username, text],
-    (err, result) => {
-      if (err) {
-        console.error("Erreur lors de l'enregistrement du message:", err);
-        return;
-      }
-      
-      // Récupérer le message avec son ID et son timestamp
-      db.query(
-        'SELECT id, username, message, timestamp FROM global_chat WHERE id = ?',
-        [result.insertId],
-        (err, messageData) => {
-          if (err || !messageData.length) {
-            console.error("Erreur lors de la récupération du message:", err);
-            return;
-          }
-          
-          // Construire l'objet message
-          const newMessage = {
-            id: messageData[0].id,
-            username: messageData[0].username,
-            text: messageData[0].message,
-            timestamp: messageData[0].timestamp
-          };
-          
-          // Diffuser le message à tous les utilisateurs connectés
-          io.emit('globalChatMessage', newMessage);
+  // Ajouter cette gestion d'événements socket pour le chat global
+  socket.on("sendGlobalMessage", (message) => {
+    if (!socket.request.session?.username) return;
+
+    const username = socket.request.session.username;
+    const text = message.trim();
+
+    if (text.length === 0 || text.length > 150) return; // Validation basique
+
+    // Insérer le message dans la base de données
+    db.query(
+      "INSERT INTO global_chat (username, message) VALUES (?, ?)",
+      [username, text],
+      (err, result) => {
+        if (err) {
+          console.error("Erreur lors de l'enregistrement du message:", err);
+          return;
         }
-      );
-    }
-  );
-});
-// Ajouter cet événement pour récupérer l'historique des messages
-socket.on('getGlobalChatHistory', () => {
-  // Récupérer les 50 derniers messages
-  db.query(
-    'SELECT id, username, message AS text, timestamp FROM global_chat ORDER BY timestamp DESC LIMIT 50',
-    (err, messages) => {
-      if (err) {
-        console.error("Erreur lors de la récupération de l'historique des messages:", err);
-        socket.emit('globalChatHistory', []);
-        return;
-      }
-      
-      // Inverser l'ordre pour avoir les plus anciens en premier
-      messages.reverse();
-      
-      socket.emit('globalChatHistory', messages);
-    }
-  );
-});
 
+        // Récupérer le message avec son ID et son timestamp
+        db.query(
+          "SELECT id, username, message, timestamp FROM global_chat WHERE id = ?",
+          [result.insertId],
+          (err, messageData) => {
+            if (err || !messageData.length) {
+              console.error("Erreur lors de la récupération du message:", err);
+              return;
+            }
+
+            // Construire l'objet message
+            const newMessage = {
+              id: messageData[0].id,
+              username: messageData[0].username,
+              text: messageData[0].message,
+              timestamp: messageData[0].timestamp,
+            };
+
+            // Diffuser le message à tous les utilisateurs connectés
+            io.emit("globalChatMessage", newMessage);
+          }
+        );
+      }
+    );
+  });
+  // Ajouter cet événement pour récupérer l'historique des messages
+  socket.on("getGlobalChatHistory", () => {
+    // Récupérer les 50 derniers messages
+    db.query(
+      "SELECT id, username, message AS text, timestamp FROM global_chat ORDER BY timestamp DESC LIMIT 50",
+      (err, messages) => {
+        if (err) {
+          console.error(
+            "Erreur lors de la récupération de l'historique des messages:",
+            err
+          );
+          socket.emit("globalChatHistory", []);
+          return;
+        }
+
+        // Inverser l'ordre pour avoir les plus anciens en premier
+        messages.reverse();
+
+        socket.emit("globalChatHistory", messages);
+      }
+    );
+  });
 
   // Gestion des joueurs en ligne
   socket.on("requestOnlinePlayers", () => {
@@ -729,77 +740,90 @@ socket.on('getGlobalChatHistory', () => {
   });
 
   // Dans server.js, remplacer le gestionnaire d'abandon existant
-// Dans server.js, modifions le gestionnaire d'abandon
-socket.on('abandonGame', async ({ gameId, player }) => {
-  const game = games[gameId];
-  if (!game) return;
+  // Dans server.js, modifions le gestionnaire d'abandon
+  socket.on("abandonGame", async ({ gameId, player }) => {
+    const game = games[gameId];
+    if (!game) return;
 
-  try {
-      const winner = player === 'player1' ? 'player2' : 'player1';
-      const player1 = game.players.find(p => p.type === 'player1');
-      const player2 = game.players.find(p => p.type === 'player2');
+    try {
+      const winner = player === "player1" ? "player2" : "player1";
+      const player1 = game.players.find((p) => p.type === "player1");
+      const player2 = game.players.find((p) => p.type === "player2");
 
       // Récupérer les scores ELO actuels
       const [player1Data, player2Data] = await Promise.all([
-          queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
-          queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
+        queryAsync("SELECT score FROM users WHERE username = ?", [
+          player1.username,
+        ]),
+        queryAsync("SELECT score FROM users WHERE username = ?", [
+          player2.username,
+        ]),
       ]);
 
       const player1Elo = player1Data[0]?.score || 1200;
       const player2Elo = player2Data[0]?.score || 1200;
 
-      const player1Score = winner === 'player1' ? 1 : 0;
+      const player1Score = winner === "player1" ? 1 : 0;
       const player2Score = 1 - player1Score;
 
-      const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, player1Score);
-      const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, player2Score);
+      const newPlayer1Elo = calculateNewElo(
+        player1Elo,
+        player2Elo,
+        player1Score
+      );
+      const newPlayer2Elo = calculateNewElo(
+        player2Elo,
+        player1Elo,
+        player2Score
+      );
 
       // Démarrer une transaction
-      await queryAsync('START TRANSACTION');
+      await queryAsync("START TRANSACTION");
 
       try {
-          // Insérer dans l'historique
-          await queryAsync(
-            'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [
-                gameId, 
-                player1.username, 
-                player2.username, 
-                player1Score, 
-                player1Elo,       // ELO avant
-                newPlayer1Elo,    // ELO après
-                'abandonGame'
-            ]
+        // Insérer dans l'historique
+        await queryAsync(
+          "INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [
+            gameId,
+            player1.username,
+            player2.username,
+            player1Score,
+            player1Elo, // ELO avant
+            newPlayer1Elo, // ELO après
+            "abandonGame",
+          ]
         );
-        
+
         // Faire la même chose pour le joueur 2
         await queryAsync(
-            'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [
-                gameId, 
-                player2.username, 
-                player1.username, 
-                player2Score,
-                player2Elo,       // ELO avant
-                newPlayer2Elo,    // ELO après
-                'abandonGame'
-            ]
+          "INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [
+            gameId,
+            player2.username,
+            player1.username,
+            player2Score,
+            player2Elo, // ELO avant
+            newPlayer2Elo, // ELO après
+            "abandonGame",
+          ]
         );
 
-          // Mettre à jour les scores
-          await Promise.all([
-              queryAsync(
-                  'UPDATE users SET score = ? WHERE username = ?',
-                  [newPlayer1Elo, player1.username]
-              ),
-              queryAsync(
-                  'UPDATE users SET score = ? WHERE username = ?',
-                  [newPlayer2Elo, player2.username]
-              )
-          ]);
+        // Mettre à jour les scores
+        await Promise.all([
+          queryAsync("UPDATE users SET score = ? WHERE username = ?", [
+            newPlayer1Elo,
+            player1.username,
+          ]),
+          queryAsync("UPDATE users SET score = ? WHERE username = ?", [
+            newPlayer2Elo,
+            player2.username,
+          ]),
+        ]);
 
-          // Mettre à jour games_played en se basant sur games_history
-          await queryAsync(`
+        // Mettre à jour games_played en se basant sur games_history
+        await queryAsync(
+          `
             UPDATE users u 
             SET games_played = (
                 SELECT COUNT(DISTINCT game_id) 
@@ -807,112 +831,127 @@ socket.on('abandonGame', async ({ gameId, player }) => {
                 WHERE player_username = u.username
             )
             WHERE username IN (?, ?)
-        `, [player1.username, player2.username]);
+        `,
+          [player1.username, player2.username]
+        );
 
-          await queryAsync('COMMIT');
+        await queryAsync("COMMIT");
 
-          // Envoyer les résultats
-          io.to(gameId).emit('gameEnded', {
-              reason: 'abandon',
-              winner: winner,
-              message: `${player === 'player1' ? 'Joueur 1' : 'Joueur 2'} a abandonné la partie`,
-              finalScores: {
-                  player1: {
-                      username: player1.username,
-                      oldElo: player1Elo,
-                      newElo: newPlayer1Elo,
-                      scoreDiff: newPlayer1Elo - player1Elo
-                  },
-                  player2: {
-                      username: player2.username,
-                      oldElo: player2Elo,
-                      newElo: newPlayer2Elo,
-                      scoreDiff: newPlayer2Elo - player2Elo
-                  }
-              }
-          });
+        // Envoyer les résultats
+        io.to(gameId).emit("gameEnded", {
+          reason: "abandon",
+          winner: winner,
+          message: `${
+            player === "player1" ? "Joueur 1" : "Joueur 2"
+          } a abandonné la partie`,
+          finalScores: {
+            player1: {
+              username: player1.username,
+              oldElo: player1Elo,
+              newElo: newPlayer1Elo,
+              scoreDiff: newPlayer1Elo - player1Elo,
+            },
+            player2: {
+              username: player2.username,
+              oldElo: player2Elo,
+              newElo: newPlayer2Elo,
+              scoreDiff: newPlayer2Elo - player2Elo,
+            },
+          },
+        });
 
-          // Nettoyer la partie
-          delete games[gameId];
-
+        // Nettoyer la partie
+        delete games[gameId];
       } catch (dbError) {
-          await queryAsync('ROLLBACK');
-          throw dbError;
+        await queryAsync("ROLLBACK");
+        throw dbError;
       }
+    } catch (error) {
+      console.error("Erreur lors de la gestion de l'abandon:", error);
+    }
+  });
+  // Gestionnaire pour le timeout
+  socket.on("timeoutGame", async ({ gameId, loser, winner }) => {
+    const game = games[gameId];
+    if (!game) return;
 
-  } catch (error) {
-      console.error('Erreur lors de la gestion de l\'abandon:', error);
-  }
-});
-// Gestionnaire pour le timeout
-socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
-  const game = games[gameId];
-  if (!game) return;
-
-  try {
-      const player1 = game.players.find(p => p.type === 'player1');
-      const player2 = game.players.find(p => p.type === 'player2');
+    try {
+      const player1 = game.players.find((p) => p.type === "player1");
+      const player2 = game.players.find((p) => p.type === "player2");
 
       const [player1Data, player2Data] = await Promise.all([
-          queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
-          queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
+        queryAsync("SELECT score FROM users WHERE username = ?", [
+          player1.username,
+        ]),
+        queryAsync("SELECT score FROM users WHERE username = ?", [
+          player2.username,
+        ]),
       ]);
 
       const player1Elo = player1Data[0]?.score || 1200;
       const player2Elo = player2Data[0]?.score || 1200;
 
-      const player1Score = winner === 'player1' ? 1 : 0;
+      const player1Score = winner === "player1" ? 1 : 0;
       const player2Score = 1 - player1Score;
 
-      const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, player1Score);
-      const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, player2Score);
+      const newPlayer1Elo = calculateNewElo(
+        player1Elo,
+        player2Elo,
+        player1Score
+      );
+      const newPlayer2Elo = calculateNewElo(
+        player2Elo,
+        player1Elo,
+        player2Score
+      );
 
       // Démarrer une transaction
-      await queryAsync('START TRANSACTION');
+      await queryAsync("START TRANSACTION");
 
       try {
-          // Insérer dans l'historique
-          await queryAsync(
-            'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [
-                gameId, 
-                player1.username, 
-                player2.username, 
-                player1Score, 
-                player1Elo,       // ELO avant
-                newPlayer1Elo,    // ELO après
-                'timeoutGame'
-            ]
+        // Insérer dans l'historique
+        await queryAsync(
+          "INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [
+            gameId,
+            player1.username,
+            player2.username,
+            player1Score,
+            player1Elo, // ELO avant
+            newPlayer1Elo, // ELO après
+            "timeoutGame",
+          ]
         );
-        
+
         // Faire la même chose pour le joueur 2
         await queryAsync(
-            'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [
-                gameId, 
-                player2.username, 
-                player1.username, 
-                player2Score,
-                player2Elo,       // ELO avant
-                newPlayer2Elo,    // ELO après
-                'timeoutGame'
-            ]
+          "INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [
+            gameId,
+            player2.username,
+            player1.username,
+            player2Score,
+            player2Elo, // ELO avant
+            newPlayer2Elo, // ELO après
+            "timeoutGame",
+          ]
         );
 
-          // Mettre à jour les scores
-          await Promise.all([
-              queryAsync(
-                  'UPDATE users SET score = ? WHERE username = ?',
-                  [newPlayer1Elo, player1.username]
-              ),
-              queryAsync(
-                  'UPDATE users SET score = ? WHERE username = ?',
-                  [newPlayer2Elo, player2.username]
-              )
-          ]);
+        // Mettre à jour les scores
+        await Promise.all([
+          queryAsync("UPDATE users SET score = ? WHERE username = ?", [
+            newPlayer1Elo,
+            player1.username,
+          ]),
+          queryAsync("UPDATE users SET score = ? WHERE username = ?", [
+            newPlayer2Elo,
+            player2.username,
+          ]),
+        ]);
 
-          // Mettre à jour games_played en se basant sur games_history
-          await queryAsync(`
+        // Mettre à jour games_played en se basant sur games_history
+        await queryAsync(
+          `
             UPDATE users u 
             SET games_played = (
                 SELECT COUNT(DISTINCT game_id) 
@@ -920,145 +959,195 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
                 WHERE player_username = u.username
             )
             WHERE username IN (?, ?)
-        `, [player1.username, player2.username]);
+        `,
+          [player1.username, player2.username]
+        );
 
-          await queryAsync('COMMIT');
+        await queryAsync("COMMIT");
 
-          io.to(gameId).emit('gameEnded', {
-              reason: 'timeout',
-              winner: winner,
-              message: `Partie terminée par timeout`,
-              finalScores: {
-                  player1: {
-                      username: player1.username,
-                      oldElo: player1Elo,
-                      newElo: newPlayer1Elo,
-                      scoreDiff: newPlayer1Elo - player1Elo
-                  },
-                  player2: {
-                      username: player2.username,
-                      oldElo: player2Elo,
-                      newElo: newPlayer2Elo,
-                      scoreDiff: newPlayer2Elo - player2Elo
-                  }
-              }
-          });
+        io.to(gameId).emit("gameEnded", {
+          reason: "timeout",
+          winner: winner,
+          message: `Partie terminée par timeout`,
+          finalScores: {
+            player1: {
+              username: player1.username,
+              oldElo: player1Elo,
+              newElo: newPlayer1Elo,
+              scoreDiff: newPlayer1Elo - player1Elo,
+            },
+            player2: {
+              username: player2.username,
+              oldElo: player2Elo,
+              newElo: newPlayer2Elo,
+              scoreDiff: newPlayer2Elo - player2Elo,
+            },
+          },
+        });
 
-          delete games[gameId];
-
+        delete games[gameId];
       } catch (dbError) {
-          await queryAsync('ROLLBACK');
-          throw dbError;
+        await queryAsync("ROLLBACK");
+        throw dbError;
       }
-
-  } catch (error) {
-      console.error('Erreur lors de la gestion du timeout:', error);
-  }
-});
+    } catch (error) {
+      console.error("Erreur lors de la gestion du timeout:", error);
+    }
+  });
   // Gestion de la mise à terre
   // Modification de l'événement miseATerre pour éviter le double comptage
   socket.on("miseATerre", async ({ gameId }) => {
     if (!games[gameId]) return;
-  
+
     const game = games[gameId];
     // Vérifier si la partie est déjà terminée
     if (game.gameEnded) return;
-    
+
     // Marquer immédiatement la partie comme terminée pour éviter les doublons
     game.gameEnded = true;
-    
+
     const currentPlayer = game.players.find((p) => p.id === socket.id);
     if (!currentPlayer || currentPlayer.type !== game.gameState.currentTurn) {
-        game.gameEnded = false; // Réinitialiser si le joueur n'est pas valide
-        return;
+      game.gameEnded = false; // Réinitialiser si le joueur n'est pas valide
+      return;
     }
-  
+
     try {
-        // Première étape : placer tous les nouveaux points
-        const playerDots = game.gameState.dots.filter(dot => dot.type === currentPlayer.type);
-        const opponentType = currentPlayer.type === "player1" ? "player2" : "player1";
-        const newDots = [];
-        const existingPositions = new Set(game.gameState.dots.map(dot => `${dot.x},${dot.y}`));
-  
-        playerDots.forEach((dot) => {
-            [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]].forEach(([dx, dy]) => {
-                const newX = dot.x + dx;
-                const newY = dot.y + dy;
-  
-                if (newX >= 0 && newX < 39 && newY >= 0 && newY < 32 && !existingPositions.has(`${newX},${newY}`)) {
-                    newDots.push({ x: newX, y: newY, type: opponentType });
-                    existingPositions.add(`${newX},${newY}`);
-                }
-            });
+      // Première étape : placer tous les nouveaux points
+      const playerDots = game.gameState.dots.filter(
+        (dot) => dot.type === currentPlayer.type
+      );
+      const opponentType =
+        currentPlayer.type === "player1" ? "player2" : "player1";
+      const newDots = [];
+      const existingPositions = new Set(
+        game.gameState.dots.map((dot) => `${dot.x},${dot.y}`)
+      );
+
+      playerDots.forEach((dot) => {
+        [
+          [-1, -1],
+          [-1, 0],
+          [-1, 1],
+          [0, -1],
+          [0, 1],
+          [1, -1],
+          [1, 0],
+          [1, 1],
+        ].forEach(([dx, dy]) => {
+          const newX = dot.x + dx;
+          const newY = dot.y + dy;
+
+          if (
+            newX >= 0 &&
+            newX < 39 &&
+            newY >= 0 &&
+            newY < 32 &&
+            !existingPositions.has(`${newX},${newY}`)
+          ) {
+            newDots.push({ x: newX, y: newY, type: opponentType });
+            existingPositions.add(`${newX},${newY}`);
+          }
         });
-  
-        // Ajouter les points à l'état du jeu
-        game.gameState.dots.push(...newDots);
-  
-        // Notifier les points
-        for (const newDot of newDots) {
-            io.to(gameId).emit("dotPlaced", newDot);
-        }
-  
-        // Attendre pour les calculs
-        await new Promise(resolve => setTimeout(resolve, 100));
-  
-        // Deuxième étape : traiter les scores et la fin de partie
-        const player1 = game.players.find(p => p.type === 'player1');
-        const player2 = game.players.find(p => p.type === 'player2');
-  
-        // Récupérer les scores ELO actuels
-        const [player1Data, player2Data] = await Promise.all([
-            queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
-            queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
-        ]);
-  
-        const player1Elo = player1Data[0]?.score || 1200;
-        const player2Elo = player2Data[0]?.score || 1200;
-  
-        // Déterminer le gagnant
-        const player1Score = game.gameState.scoreRed > game.gameState.scoreBlue ? 1 : 0;
-        const player2Score = 1 - player1Score;
-  
-        // Calculer les nouveaux scores ELO
-        const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, player1Score);
-        const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, player2Score);
-  
-        // Transaction unique pour l'enregistrement
-        await queryAsync('START TRANSACTION');
-  
-        try {
-            // Vérifier si la partie est déjà enregistrée
-            const historyExists = await queryAsync(
-                'SELECT 1 FROM games_history WHERE game_id = ? LIMIT 1',
-                [gameId]
-            );
-  
-            if (!historyExists.length) {
-              await Promise.all([
-                // Mise à jour des scores uniquement
-                queryAsync(
-                    'UPDATE users SET score = ? WHERE username = ?',
-                    [newPlayer1Elo, player1.username]
-                ),
-                queryAsync(
-                    'UPDATE users SET score = ? WHERE username = ?',
-                    [newPlayer2Elo, player2.username]
-                ),
-                // Enregistrer l'historique pour le joueur 1
-                queryAsync(
-                    'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [gameId, player1.username, player2.username, player1Score, player1Elo, newPlayer1Elo, 'miseATerre']
-                ),
-                // Enregistrer l'historique pour le joueur 2
-                queryAsync(
-                    'INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [gameId, player2.username, player1.username, player2Score, player2Elo, newPlayer2Elo, 'miseATerre']
-                )
-            ]);
-          
-              // Mettre à jour games_played APRÈS en se basant sur games_history
-              await queryAsync(`
+      });
+
+      // Ajouter les points à l'état du jeu
+      game.gameState.dots.push(...newDots);
+
+      // Notifier les points
+      for (const newDot of newDots) {
+        io.to(gameId).emit("dotPlaced", newDot);
+      }
+
+      // Attendre pour les calculs
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Deuxième étape : traiter les scores et la fin de partie
+      const player1 = game.players.find((p) => p.type === "player1");
+      const player2 = game.players.find((p) => p.type === "player2");
+
+      // Récupérer les scores ELO actuels
+      const [player1Data, player2Data] = await Promise.all([
+        queryAsync("SELECT score FROM users WHERE username = ?", [
+          player1.username,
+        ]),
+        queryAsync("SELECT score FROM users WHERE username = ?", [
+          player2.username,
+        ]),
+      ]);
+
+      const player1Elo = player1Data[0]?.score || 1200;
+      const player2Elo = player2Data[0]?.score || 1200;
+
+      // Déterminer le gagnant
+      const player1Score =
+        game.gameState.scoreRed > game.gameState.scoreBlue ? 1 : 0;
+      const player2Score = 1 - player1Score;
+
+      // Calculer les nouveaux scores ELO
+      const newPlayer1Elo = calculateNewElo(
+        player1Elo,
+        player2Elo,
+        player1Score
+      );
+      const newPlayer2Elo = calculateNewElo(
+        player2Elo,
+        player1Elo,
+        player2Score
+      );
+
+      // Transaction unique pour l'enregistrement
+      await queryAsync("START TRANSACTION");
+
+      try {
+        // Vérifier si la partie est déjà enregistrée
+        const historyExists = await queryAsync(
+          "SELECT 1 FROM games_history WHERE game_id = ? LIMIT 1",
+          [gameId]
+        );
+
+        if (!historyExists.length) {
+          await Promise.all([
+            // Mise à jour des scores uniquement
+            queryAsync("UPDATE users SET score = ? WHERE username = ?", [
+              newPlayer1Elo,
+              player1.username,
+            ]),
+            queryAsync("UPDATE users SET score = ? WHERE username = ?", [
+              newPlayer2Elo,
+              player2.username,
+            ]),
+            // Enregistrer l'historique pour le joueur 1
+            queryAsync(
+              "INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              [
+                gameId,
+                player1.username,
+                player2.username,
+                player1Score,
+                player1Elo,
+                newPlayer1Elo,
+                "miseATerre",
+              ]
+            ),
+            // Enregistrer l'historique pour le joueur 2
+            queryAsync(
+              "INSERT INTO games_history (game_id, player_username, opponent_username, result, player_elo_before, player_elo_after, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              [
+                gameId,
+                player2.username,
+                player1.username,
+                player2Score,
+                player2Elo,
+                newPlayer2Elo,
+                "miseATerre",
+              ]
+            ),
+          ]);
+
+          // Mettre à jour games_played APRÈS en se basant sur games_history
+          await queryAsync(
+            `
                 UPDATE users u 
                 SET games_played = (
                     SELECT COUNT(DISTINCT game_id) 
@@ -1066,130 +1155,133 @@ socket.on('timeoutGame', async ({ gameId, loser, winner }) => {
                     WHERE player_username = u.username
                 )
                 WHERE username IN (?, ?)
-            `, [player1.username, player2.username]);
-          
-              await queryAsync('COMMIT');
-          
-          } else {
-              await queryAsync('ROLLBACK');
-          }
-  
-            // Envoyer le résultat final
-            io.to(gameId).emit('gameEnded', {
-                reason: 'miseATerre',
-                winner: player1Score > player2Score ? 'player1' : 'player2',
-                message: 'Partie terminée par mise à terre',
-                finalScores: {
-                    player1: {
-                        username: player1.username,
-                        oldElo: player1Elo,
-                        newElo: newPlayer1Elo,
-                        scoreDiff: newPlayer1Elo - player1Elo
-                    },
-                    player2: {
-                        username: player2.username,
-                        oldElo: player2Elo,
-                        newElo: newPlayer2Elo,
-                        scoreDiff: newPlayer2Elo - player2Elo
-                    }
-                }
-            });
-  
-            // Nettoyer la partie
-            delete games[gameId];
-  
-        } catch (dbError) {
-            await queryAsync('ROLLBACK');
-            throw dbError;
+            `,
+            [player1.username, player2.username]
+          );
+
+          await queryAsync("COMMIT");
+        } else {
+          await queryAsync("ROLLBACK");
         }
-  
-    } catch (error) {
-        console.error('Erreur lors de la mise à terre:', error);
-        game.gameEnded = false;
-        io.to(gameId).emit('gameError', {
-            message: 'Une erreur est survenue lors de la mise à terre'
+
+        // Envoyer le résultat final
+        io.to(gameId).emit("gameEnded", {
+          reason: "miseATerre",
+          winner: player1Score > player2Score ? "player1" : "player2",
+          message: "Partie terminée par mise à terre",
+          finalScores: {
+            player1: {
+              username: player1.username,
+              oldElo: player1Elo,
+              newElo: newPlayer1Elo,
+              scoreDiff: newPlayer1Elo - player1Elo,
+            },
+            player2: {
+              username: player2.username,
+              oldElo: player2Elo,
+              newElo: newPlayer2Elo,
+              scoreDiff: newPlayer2Elo - player2Elo,
+            },
+          },
         });
+
+        // Nettoyer la partie
+        delete games[gameId];
+      } catch (dbError) {
+        await queryAsync("ROLLBACK");
+        throw dbError;
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à terre:", error);
+      game.gameEnded = false;
+      io.to(gameId).emit("gameError", {
+        message: "Une erreur est survenue lors de la mise à terre",
+      });
     }
   });
-  
-  
-  socket.on('gameOver', async ({ gameId, winner, reason }) => {
+
+  socket.on("gameOver", async ({ gameId, winner, reason }) => {
     await handleGameEnd(gameId, winner, reason);
-    
-    io.to(gameId).emit('gameEnded', {
+
+    io.to(gameId).emit("gameEnded", {
       reason: reason,
       winner: winner,
-      message: `Partie terminée - ${reason}`
+      message: `Partie terminée - ${reason}`,
     });
   });
 
   // Fonction de gestion de fin de partie
-// Modifier la fonction handleGameEnd
-async function handleGameEnd(gameId, winner, reason) {
-  const game = games[gameId];
-  if (!game || game.gameEnded) return; // Empêcher le double comptage
-  
-  try {
+  // Modifier la fonction handleGameEnd
+  async function handleGameEnd(gameId, winner, reason) {
+    const game = games[gameId];
+    if (!game || game.gameEnded) return; // Empêcher le double comptage
+
+    try {
       // Marquer la partie comme terminée
       game.gameEnded = true;
-      
-      const player1 = game.players.find(p => p.type === 'player1');
-      const player2 = game.players.find(p => p.type === 'player2');
- 
+
+      const player1 = game.players.find((p) => p.type === "player1");
+      const player2 = game.players.find((p) => p.type === "player2");
+
       const [player1Data, player2Data] = await Promise.all([
-          queryAsync('SELECT score FROM users WHERE username = ?', [player1.username]),
-          queryAsync('SELECT score FROM users WHERE username = ?', [player2.username])
+        queryAsync("SELECT score FROM users WHERE username = ?", [
+          player1.username,
+        ]),
+        queryAsync("SELECT score FROM users WHERE username = ?", [
+          player2.username,
+        ]),
       ]);
- 
+
       const player1Elo = player1Data[0]?.score || 1200;
       const player2Elo = player2Data[0]?.score || 1200;
- 
+
       // Déterminer les scores selon la raison
       let p1Score, p2Score;
       switch (reason) {
-          case 'miseATerre':
-              p1Score = game.gameState.scoreRed > game.gameState.scoreBlue ? 1 : 0;
-              p2Score = 1 - p1Score;
-              break;
-          case 'abandon':
-              p1Score = winner === 'player1' ? 1 : 0;
-              p2Score = 1 - p1Score;
-              break;
-          case 'timeout':
-              p1Score = winner === 'player1' ? 1 : 0;
-              p2Score = 1 - p1Score;
-              break;
-          default:
-              p1Score = 0.5;
-              p2Score = 0.5;
+        case "miseATerre":
+          p1Score = game.gameState.scoreRed > game.gameState.scoreBlue ? 1 : 0;
+          p2Score = 1 - p1Score;
+          break;
+        case "abandon":
+          p1Score = winner === "player1" ? 1 : 0;
+          p2Score = 1 - p1Score;
+          break;
+        case "timeout":
+          p1Score = winner === "player1" ? 1 : 0;
+          p2Score = 1 - p1Score;
+          break;
+        default:
+          p1Score = 0.5;
+          p2Score = 0.5;
       }
- 
+
       const newPlayer1Elo = calculateNewElo(player1Elo, player2Elo, p1Score);
       const newPlayer2Elo = calculateNewElo(player2Elo, player1Elo, p2Score);
- 
-      await queryAsync('START TRANSACTION');
- 
+
+      await queryAsync("START TRANSACTION");
+
       try {
-          // Mettre à jour les scores et enregistrer l'historique
-          await Promise.all([
-              // Mise à jour des scores uniquement
-              queryAsync(
-                  'UPDATE users SET score = ? WHERE username = ?',
-                  [newPlayer1Elo, player1.username]
-              ),
-              queryAsync(
-                  'UPDATE users SET score = ? WHERE username = ?',
-                  [newPlayer2Elo, player2.username]
-              ),
-              // Enregistrer dans l'historique
-              queryAsync(
-                  'INSERT INTO games_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)',
-                  [gameId, player1.username, player2.username, p1Score, reason]
-              )
-          ]);
- 
-          // Mettre à jour games_played en comptant à la fois comme joueur et comme adversaire
-          await queryAsync(`
+        // Mettre à jour les scores et enregistrer l'historique
+        await Promise.all([
+          // Mise à jour des scores uniquement
+          queryAsync("UPDATE users SET score = ? WHERE username = ?", [
+            newPlayer1Elo,
+            player1.username,
+          ]),
+          queryAsync("UPDATE users SET score = ? WHERE username = ?", [
+            newPlayer2Elo,
+            player2.username,
+          ]),
+          // Enregistrer dans l'historique
+          queryAsync(
+            "INSERT INTO games_history (game_id, player_username, opponent_username, result, end_reason) VALUES (?, ?, ?, ?, ?)",
+            [gameId, player1.username, player2.username, p1Score, reason]
+          ),
+        ]);
+
+        // Mettre à jour games_played en comptant à la fois comme joueur et comme adversaire
+        await queryAsync(
+          `
             UPDATE users u 
             SET games_played = (
                 SELECT COUNT(DISTINCT game_id) 
@@ -1197,71 +1289,70 @@ async function handleGameEnd(gameId, winner, reason) {
                 WHERE player_username = u.username
             )
             WHERE username IN (?, ?)
-        `, [player1.username, player2.username]);
- 
-          await queryAsync('COMMIT');
- 
-          // Nettoyer la partie
-          delete games[gameId];
-          
-          return {
-              player1: { oldElo: player1Elo, newElo: newPlayer1Elo },
-              player2: { oldElo: player2Elo, newElo: newPlayer2Elo }
-          };
- 
+        `,
+          [player1.username, player2.username]
+        );
+
+        await queryAsync("COMMIT");
+
+        // Nettoyer la partie
+        delete games[gameId];
+
+        return {
+          player1: { oldElo: player1Elo, newElo: newPlayer1Elo },
+          player2: { oldElo: player2Elo, newElo: newPlayer2Elo },
+        };
       } catch (dbError) {
-          await queryAsync('ROLLBACK');
-          throw dbError;
+        await queryAsync("ROLLBACK");
+        throw dbError;
       }
- 
-  } catch (error) {
-      console.error('Erreur lors de la fin de partie:', error);
+    } catch (error) {
+      console.error("Erreur lors de la fin de partie:", error);
       throw error;
+    }
   }
- }
-// Fonction pour gérer la reconnexion
-function handleDisconnect() {
-  db.on('error', function(err) {
-      console.log('db error', err);
-      if(err.code === 'PROTOCOL_CONNECTION_LOST') {
-          handleDisconnect();
+  // Fonction pour gérer la reconnexion
+  function handleDisconnect() {
+    db.on("error", function (err) {
+      console.log("db error", err);
+      if (err.code === "PROTOCOL_CONNECTION_LOST") {
+        handleDisconnect();
       } else {
-          throw err;
+        throw err;
       }
-  });
-}
+    });
+  }
 
-handleDisconnect();
+  handleDisconnect();
 
-// Fonction pour vérifier/rétablir la connexion avant chaque requête
-function ensureConnection() {
-  return new Promise((resolve, reject) => {
-      if (db.state === 'disconnected') {
-          db.connect(function(err) {
-              if (err) {
-                  reject(err);
-              } else {
-                  resolve();
-              }
-          });
+  // Fonction pour vérifier/rétablir la connexion avant chaque requête
+  function ensureConnection() {
+    return new Promise((resolve, reject) => {
+      if (db.state === "disconnected") {
+        db.connect(function (err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
       } else {
-          resolve();
+        resolve();
       }
-  });
-}
+    });
+  }
 
-// Modifier la fonction queryAsync
-function queryAsync(sql, values) {
-  return ensureConnection()
-      .then(() => {
-          return new Promise((resolve, reject) => {
-              db.query(sql, values, (err, results) => {
-                  if (err) reject(err);
-                  else resolve(results);
-              });
-          });
+  // Modifier la fonction queryAsync
+  function queryAsync(sql, values) {
+    return ensureConnection().then(() => {
+      return new Promise((resolve, reject) => {
+        db.query(sql, values, (err, results) => {
+          if (err) reject(err);
+          else resolve(results);
+        });
       });
-}
+    });
+  }
 
   // Gestion des demandes de match
   socket.on("requestMatch", (data) => {
@@ -1396,21 +1487,22 @@ function queryAsync(sql, values) {
         ),
       };
 
-       // Assurez-vous que l'état complet du jeu est envoyé, y compris les timers actuels
-    socket.emit("gameJoined", {
-      playerType: existingPlayer.type,
-      gameState: {
-        ...games[gameId].gameState,
-        // Envoyez explicitement l'état actuel des timers
-        timers: {
-          player1Time: games[gameId].gameState.timers.player1Time,
-          player2Time: games[gameId].gameState.timers.player2Time,
-          commonReflectionTime: games[gameId].gameState.timers.commonReflectionTime,
-          isReflectionPhase: games[gameId].gameState.timers.isReflectionPhase
-        }
-      },
-      gameId: gameId,
-    });
+      // Assurez-vous que l'état complet du jeu est envoyé, y compris les timers actuels
+      socket.emit("gameJoined", {
+        playerType: existingPlayer.type,
+        gameState: {
+          ...games[gameId].gameState,
+          // Envoyez explicitement l'état actuel des timers
+          timers: {
+            player1Time: games[gameId].gameState.timers.player1Time,
+            player2Time: games[gameId].gameState.timers.player2Time,
+            commonReflectionTime:
+              games[gameId].gameState.timers.commonReflectionTime,
+            isReflectionPhase: games[gameId].gameState.timers.isReflectionPhase,
+          },
+        },
+        gameId: gameId,
+      });
       return;
     }
 
@@ -1561,8 +1653,6 @@ function queryAsync(sql, values) {
 
       // Gestion de la base de données pour les scores des joueurs
     }
-    
-    
   );
 
   // Ajouter un gestionnaire pour la mise à jour de l'état des timers
@@ -1581,54 +1671,56 @@ function queryAsync(sql, values) {
   });
   // Gestion de la déconnexion
   socket.on("disconnect", () => {
-  console.log("User disconnected:", socket.id);
+    console.log("User disconnected:", socket.id);
 
-  const playerInfo = onlinePlayers.get(socket.id);
-  if (!playerInfo) return;
+    const playerInfo = onlinePlayers.get(socket.id);
+    if (!playerInfo) return;
 
-  const username = playerInfo.username;
+    const username = playerInfo.username;
 
-  // Créer un timeout pour la déconnexion
-  const timeout = setTimeout(() => {
-    // Vérifier si le joueur n'est pas déjà reconnecté
-    const reconnected = Array.from(onlinePlayers.values()).some(
-      (p) => p.username === username && p.id !== socket.id
-    );
+    // Créer un timeout pour la déconnexion
+    const timeout = setTimeout(() => {
+      // Vérifier si le joueur n'est pas déjà reconnecté
+      const reconnected = Array.from(onlinePlayers.values()).some(
+        (p) => p.username === username && p.id !== socket.id
+      );
 
-    if (!reconnected) {
-      onlinePlayers.delete(socket.id);
-      io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
+      if (!reconnected) {
+        onlinePlayers.delete(socket.id);
+        io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
 
-      // Gérer la déconnexion dans les parties
-      for (const [gameId, game] of Object.entries(games)) {
-        // Vérifier si c'est un joueur
-        const playerIndex = game.players.findIndex((p) => p.id === socket.id);
-        if (playerIndex !== -1) {
-          game.players.splice(playerIndex, 1);
-          if (game.players.length === 1) {
-            io.to(gameId).emit("playerDisconnected");
-          } else if (game.players.length === 0) {
-            delete games[gameId];
+        // Gérer la déconnexion dans les parties
+        for (const [gameId, game] of Object.entries(games)) {
+          // Vérifier si c'est un joueur
+          const playerIndex = game.players.findIndex((p) => p.id === socket.id);
+          if (playerIndex !== -1) {
+            game.players.splice(playerIndex, 1);
+            if (game.players.length === 1) {
+              io.to(gameId).emit("playerDisconnected");
+            } else if (game.players.length === 0) {
+              delete games[gameId];
+            }
+          }
+
+          // Vérifier si c'est un spectateur
+          const spectatorIndex = game.spectators.findIndex(
+            (s) => s.socketId === socket.id
+          );
+          if (spectatorIndex !== -1) {
+            game.spectators.splice(spectatorIndex, 1);
+
+            // Notifier les autres utilisateurs
+            io.to(gameId).emit("spectatorLeft", {
+              spectatorCount: game.spectators.length,
+              username: username,
+            });
           }
         }
-        
-        // Vérifier si c'est un spectateur
-        const spectatorIndex = game.spectators.findIndex(s => s.socketId === socket.id);
-        if (spectatorIndex !== -1) {
-          game.spectators.splice(spectatorIndex, 1);
-          
-          // Notifier les autres utilisateurs
-          io.to(gameId).emit('spectatorLeft', {
-            spectatorCount: game.spectators.length,
-            username: username
-          });
-        }
       }
-    }
-  }, 5000); // 5 secondes de délai
+    }, 5000); // 5 secondes de délai
 
-  userDisconnectTimeouts.set(username, timeout);
-});
+    userDisconnectTimeouts.set(username, timeout);
+  });
 
   // Gestion de la tentative de reconnexion
   socket.on("reconnect_attempt", () => {
