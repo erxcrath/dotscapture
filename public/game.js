@@ -2,6 +2,10 @@
 // Au début du fichier game.js, après la déclaration des variables
 let player1HasPlayed = false;
 let player2HasPlayed = false;
+let initialized = false;
+let isSpectator = false;
+let lastGameState = null;
+
 const MAX_X = 39;
 const MAX_Y = 32;
 let Scale = Math.min((window.innerWidth-20) / MAX_X, (window.innerHeight) / MAX_Y);
@@ -80,6 +84,45 @@ class Dot {
         return n;
     }
 }
+function checkSpectatorMode() {
+    // Détection correcte du mode spectateur lors de l'initialisation
+    const urlParams = new URLSearchParams(window.location.search);
+    isSpectator = urlParams.get('spectator') === 'true';
+    
+    console.log("Détection du mode spectateur:", isSpectator);
+    
+    // N'exécuter ces actions que si nous sommes vraiment en mode spectateur
+    if (isSpectator === true) {
+        console.log("Mode spectateur activé");
+        
+        // Désactiver les interactions avec le jeu
+        svgElement.removeEventListener('mouseup', mouseReleased);
+        svgElement.removeEventListener('mousemove', mouseDragged);
+        
+        // Désactiver les boutons du jeu
+        document.getElementById('miseATerreBtn').disabled = true;
+        document.getElementById('abandonBtn').disabled = true;
+        
+        // Ajouter un bandeau "Spectateur"
+        const spectatorBanner = document.createElement('div');
+        spectatorBanner.className = 'spectator-banner';
+        spectatorBanner.innerHTML = `
+            <span>🔴 MODE SPECTATEUR</span>
+            <button onclick="leaveSpectatorMode()" class="leave-btn">Quitter</button>
+        `;
+        document.body.appendChild(spectatorBanner);
+        
+        // Modifier l'affichage selon les besoins
+        document.querySelector('.game-buttons-container').style.display = 'none';
+    }
+}  
+  // Fonction pour quitter le mode spectateur
+  function leaveSpectatorMode() {
+    if (confirm("Voulez-vous vraiment quitter le mode spectateur ?")) {
+      localStorage.removeItem('spectatingGameId');
+      window.location.href = '/accueil';
+    }
+  }
 
 // Fonctions de configuration et rendu
 function setup() {
@@ -645,6 +688,9 @@ function updateScore() {
 function handleGameState(gameState) {
     if (!gameState) return;
     
+    // Stocker le dernier état reçu
+    lastGameState = gameState;
+    
     // Réinitialiser complètement l'état
     render = [];
     reddots = matrixArray(MAX_X, MAX_Y);
@@ -654,49 +700,108 @@ function handleGameState(gameState) {
     scoreRed = gameState.scoreRed || 0;
     scoreBlue = gameState.scoreBlue || 0;
     currentTurn = gameState.currentTurn;
-
+  
     // Restaurer les timers
     if (gameState.timers) {
-        player1Time = gameState.timers.player1Time;
-        player2Time = gameState.timers.player2Time;
-        commonReflectionTime = gameState.timers.commonReflectionTime;
-        isReflectionPhase = gameState.timers.isReflectionPhase;
+      player1Time = gameState.timers.player1Time;
+      player2Time = gameState.timers.player2Time;
+      commonReflectionTime = gameState.timers.commonReflectionTime;
+      isReflectionPhase = gameState.timers.isReflectionPhase;
     }
-
+  
     // Restaurer les points sans recalculer les captures
     if (gameState.dots?.length > 0) {
-        for (const dot of gameState.dots) {
-            let newDot = new Dot(dot.type === 'player1' ? 1 : 2, dot.x, dot.y);
-            if (dot.captured) newDot.captured = true;
-            
-            if (dot.type === 'player1') {
-                reddots[dot.x][dot.y] = newDot;
-            } else {
-                bluedots[dot.x][dot.y] = newDot;
-            }
-            render.push(newDot);
+      for (const dot of gameState.dots) {
+        let newDot = new Dot(dot.type === 'player1' ? 1 : 2, dot.x, dot.y);
+        if (dot.captured) newDot.captured = true;
+        
+        if (dot.type === 'player1') {
+          reddots[dot.x][dot.y] = newDot;
+        } else {
+          bluedots[dot.x][dot.y] = newDot;
         }
+        render.push(newDot);
+      }
     }
-
+  
     // Restaurer les outlines depuis gameState
     if (gameState.outlines && Array.isArray(gameState.outlines)) {
-        outlines = gameState.outlines.map(outline => 
-            outline.map(point => {
-                const dotType = point.type === 'red' ? 1 : 2;
-                const newDot = new Dot(dotType, point.x, point.y);
-                newDot.c = point.c;
-                return newDot;
-            })
-        );
+      outlines = gameState.outlines.map(outline => 
+        outline.map(point => {
+          const dotType = point.type === 'red' ? 1 : 2;
+          const newDot = new Dot(dotType, point.x, point.y);
+          newDot.c = point.c;
+          return newDot;
+        })
+      );
     }
-
+  
     // Mettre à jour l'affichage
     updateTimerDisplay();
     document.getElementById("RED").innerHTML = scoreRed;
     document.getElementById("BLUE").innerHTML = scoreBlue;
     draw();
-}
+    
+    // Mettre à jour les informations des spectateurs si en mode spectateur
+    if (isSpectator) {
+      updateSpectatorInfo(gameState);
+    }
+  }
 
+  function updateSpectatorInfo(gameState) {
+    // Vérifier si l'élément d'info existe, sinon le créer
+    let infoElement = document.querySelector('.spectator-info');
+    if (!infoElement) {
+      infoElement = document.createElement('div');
+      infoElement.className = 'spectator-info';
+      document.body.appendChild(infoElement);
+    }
+    
+    // Mettre à jour les informations
+    if (gameState.spectatorCount !== undefined) {
+      infoElement.innerHTML = `👁️ ${gameState.spectatorCount} spectateurs`;
+    }
+  }
+  
+  // 7. Ajouter des gestionnaires d'événements pour les notifications de spectateurs
+  socket.on('spectatorJoined', (data) => {
+    console.log("Nouveau spectateur:", data.username);
+    
+    // Si on est spectateur, mettre à jour le compteur
+    if (isSpectator && lastGameState) {
+      lastGameState.spectatorCount = data.spectatorCount;
+      updateSpectatorInfo(lastGameState);
+    }
+  });
+
+  socket.on('gameSpectated', (data) => {
+    console.log("Rejoint en tant que spectateur:", data);
+    isSpectator = true; // S'assurer que isSpectator est bien défini ici
+    handleGameState(data.gameState);
+});
+  
+  socket.on('spectatorLeft', (data) => {
+    console.log("Spectateur parti:", data.username);
+    
+    // Si on est spectateur, mettre à jour le compteur
+    if (isSpectator && lastGameState) {
+      lastGameState.spectatorCount = data.spectatorCount;
+      updateSpectatorInfo(lastGameState);
+    }
+  });
+  
+  // 8. Appeler la fonction de vérification de mode spectateur au chargement
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!initialized) {
+        initialized = true;
+        console.log("Initialisation du jeu...");
+        setup();
+        checkSpectatorMode();
+        gameLoop();
+    }
+});
+
+  
 // Événements socket
 // Événements socket
 socket.on('gameJoined', (data) => {
@@ -705,18 +810,40 @@ socket.on('gameJoined', (data) => {
     
     // Mettre à jour les noms des joueurs
     if (data.gameState.player1Name) {
-        document.getElementById('player1Name').textContent = data.gameState.player1Name;
+      document.getElementById('player1Name').textContent = data.gameState.player1Name;
     }
     if (data.gameState.player2Name) {
-        document.getElementById('player2Name').textContent = data.gameState.player2Name;
+      document.getElementById('player2Name').textContent = data.gameState.player2Name;
+    }
+    
+    // Assurez-vous de prendre en compte l'état des timers
+    if (data.gameState.timers) {
+      // Utilisez explicitement les valeurs reçues
+      player1Time = data.gameState.timers.player1Time;
+      player2Time = data.gameState.timers.player2Time;
+      commonReflectionTime = data.gameState.timers.commonReflectionTime;
+      isReflectionPhase = data.gameState.timers.isReflectionPhase;
+      
+      // Arrêtez les timers existants et redémarrez avec les bonnes valeurs
+      if (activeTimer) clearInterval(activeTimer);
+      if (reflectionTimer) clearInterval(reflectionTimer);
+      
+      // Redémarrer le bon timer selon l'état actuel
+      if (isReflectionPhase) {
+        reflectionTimer = setInterval(() => {
+          // logique du timer de réflexion
+        }, 1000);
+      } else {
+        startMainTimer(); // Démarrer le timer principal avec les valeurs actuelles
+      }
     }
     
     handleGameState(data.gameState);
     
-    if (render.length === 0) {
-        //initializeCenterPoints();
-    }
-});
+    updateTimerDisplay(); // Mettre à jour l'affichage des timers
+  });
+
+  
 socket.on('gameStart', (gameState) => {
     player1HasPlayed = false;
     player2HasPlayed = false;
@@ -822,11 +949,21 @@ socket.on('gameEnded', (data) => {
     }, 5000);
 });
 socket.on('connect', () => {
-    console.log('Socket connected:', socket.id);
-    
-    // Si on a un gameId stocké, tenter de rejoindre automatiquement
+    console.log('Socket connecté, ID:', socket.id);
+    const spectatingGameId = localStorage.getItem('spectatingGameId');
     const storedGameId = localStorage.getItem('gameId');
-    if (storedGameId) {
+    
+    // Priorité au mode spectateur
+    if (spectatingGameId) {
+        console.log("Rejoindre en tant que spectateur:", spectatingGameId);
+        gameId = spectatingGameId;
+        isSpectator = true; // Important: définir le mode spectateur ici
+        socket.emit('spectateGame', spectatingGameId);
+    } 
+    else if (storedGameId) {
+        console.log("Rejoindre en tant que joueur:", storedGameId);
+        gameId = storedGameId;
+        isSpectator = false; // S'assurer qu'on n'est pas en mode spectateur
         socket.emit('joinGame', storedGameId);
     }
 });
@@ -859,11 +996,6 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Démarrage du jeu
-document.addEventListener('DOMContentLoaded', () => {
-    setup();
-    gameLoop();
-});
 
 // Gestion du redimensionnement
 window.addEventListener('resize', () => {

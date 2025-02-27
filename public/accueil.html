@@ -7,6 +7,93 @@
     <title>Jeu de Points</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
+        .active-game-card {
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .active-game-card:hover {
+            background-color: #e8f0fe;
+            transform: translateY(-2px);
+        }
+
+        .game-players {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .game-scores {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .score-red {
+            color: #ed2939;
+        }
+
+        .score-blue {
+            color: #4267B2;
+        }
+
+        .spectator-count {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #4caf50;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .no-games {
+            text-align: center;
+            padding: 20px;
+            color: #777;
+            font-style: italic;
+        }
+
+        .game-button.watch {
+            background-color: #f3f3f3;
+            color: #333;
+            font-size: 14px;
+            padding: 8px 12px;
+            margin-top: 10px;
+        }
+
+        .game-button.watch:hover {
+            background-color: #e0e0e0;
+        }
+
+        /* Style pour le bouton "Parties en cours" */
+        .game-button.live {
+            background-color: #ff4b4b;
+            color: white;
+        }
+
+        .game-button.live:hover {
+            background-color: #e04141;
+        }
+
+        /* Badge pour le nombre de parties en cours */
+        .live-count {
+            background-color: white;
+            color: #ff4b4b;
+            border-radius: 10px;
+            padding: 1px 6px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
         .message-badge {
             display: inline-block;
             background-color: #ff3b30;
@@ -560,22 +647,24 @@
         </div>
 
         <div class="buttons-grid">
-            <input type="text" class="game-input" id="gameId" placeholder="🎮 ID de la partie">
-            <button onclick="joinGame()" class="game-button primary full-width">
+            <!--<input type="text" class="game-input" id="gameId" placeholder="🎮 ID de la partie">
+            <button onclick="joinGame()" class="game-button primary ">
                 <span class="button-icon">▶️</span>Rejoindre une partie
-            </button>
+            </button>-->
             <button onclick="showPlayers()" class="game-button">
                 <span class="button-icon">👥</span>En ligne <span id="online-player-count" class="player-count">0</span>
             </button>
             <button onclick="showLeaderboard()" class="game-button">
                 <span class="button-icon">🏆</span>Classement
             </button>
-            <!-- Remplacer le bouton chat existant par celui-ci -->
+            <button onclick="showActiveGames()" class="game-button live">
+                <span class="button-icon">🔴</span>En direct <span id="live-game-count" class="live-count">0</span>
+            </button>
             <button onclick="showChat()" class="game-button">
                 <span class="button-icon">💬</span>Chat
                 <span id="unreadBadge" class="message-badge" style="display:none;">0</span>
             </button>
-            <button onclick="window.location.href='/logout'" class="game-button-deconnexion">
+            <button onclick="window.location.href='/logout'" class="game-button-deconnexion full-width">
                 <span class="button-icon">🚪</span>Déconnexion
             </button>
         </div>
@@ -590,6 +679,16 @@
             <div class="loading-text">Chargement des joueurs...</div>
         </div>
     </div>
+
+    <div id="activeGamesModal" class="modal">
+        <span class="close-button" onclick="hideActiveGames()">&times;</span>
+        <h2>Parties en cours</h2>
+        <div id="active-games-container" class="player-list">
+            <div class="loading-text">Chargement des parties en cours...</div>
+        </div>
+    </div>
+
+
 
     <div id="leaderboardModal" class="modal">
         <span class="close-button" onclick="hideLeaderboard()">&times;</span>
@@ -647,9 +746,11 @@
     </div>
 
     <script>
+        let activeGamesData = [];
+        let activeGamesUpdateInterval;
 
         // Ajouter cette variable au début de votre script pour garder une trace des joueurs en ligne
-let onlinePlayersData = [];
+        let onlinePlayersData = [];
 
         // Variables pour le suivi des messages
         let unreadCount = 0;
@@ -664,6 +765,103 @@ let onlinePlayersData = [];
             if (gameId) {
                 socket.emit('joinGame', gameId);
             }
+        }
+
+        function showActiveGames() {
+            document.getElementById('activeGamesModal').style.display = 'block';
+            document.getElementById('modalBackdrop').style.display = 'block';
+
+            // Charger les parties en cours
+            fetchActiveGames();
+
+            // Configurer une mise à jour automatique
+            if (activeGamesUpdateInterval) {
+                clearInterval(activeGamesUpdateInterval);
+            }
+            activeGamesUpdateInterval = setInterval(fetchActiveGames, 10000); // Mettre à jour toutes les 10 secondes
+        }
+
+        // Masquer la modale des parties en cours
+        function hideActiveGames() {
+            document.getElementById('activeGamesModal').style.display = 'none';
+            document.getElementById('modalBackdrop').style.display = 'none';
+
+            // Arrêter la mise à jour automatique
+            if (activeGamesUpdateInterval) {
+                clearInterval(activeGamesUpdateInterval);
+                activeGamesUpdateInterval = null;
+            }
+        }
+
+        // Récupérer les parties en cours
+        function fetchActiveGames() {
+            fetch('/api/active-games')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erreur lors de la récupération des parties en cours');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    activeGamesData = data;
+                    updateActiveGamesDisplay();
+                    updateLiveCount();
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    document.getElementById('active-games-container').innerHTML =
+                        '<div class="loading-text">Erreur lors du chargement des parties</div>';
+                });
+        }
+
+        // Mettre à jour l'affichage des parties en cours
+        function updateActiveGamesDisplay() {
+            const container = document.getElementById('active-games-container');
+
+            if (!activeGamesData || activeGamesData.length === 0) {
+                container.innerHTML = '<div class="no-games">Aucune partie en cours</div>';
+                return;
+            }
+
+            container.innerHTML = activeGamesData.map(game => `
+      <div class="active-game-card">
+        <div class="game-players">
+          <span>${game.player1}</span>
+          <span>vs</span>
+          <span>${game.player2}</span>
+        </div>
+        <div class="game-scores">
+          <span class="score-red">${game.scoreRed}</span>
+          <span>-</span>
+          <span class="score-blue">${game.scoreBlue}</span>
+        </div>
+        <button onclick="spectateGame('${game.id}')" class="game-button watch">
+          <span class="button-icon">👁️</span> Regarder
+        </button>
+        <div class="spectator-count">
+          <span class="button-icon">👥</span> ${game.spectatorCount}
+        </div>
+      </div>
+    `).join('');
+        }
+
+        // Mettre à jour le compteur de parties en direct
+        function updateLiveCount() {
+            const countElement = document.getElementById('live-game-count');
+            if (countElement) {
+                countElement.textContent = activeGamesData.length;
+            }
+        }
+
+        // Rejoindre une partie en tant que spectateur
+        function spectateGame(gameId) {
+            if (!gameId) return;
+
+            // Émettre l'événement pour rejoindre en tant que spectateur
+            socket.emit('spectateGame', gameId);
+
+            // Masquer la modale
+            hideActiveGames();
         }
 
         // Fonction pour mettre à jour le badge de messages non lus
@@ -721,19 +919,19 @@ let onlinePlayersData = [];
         }
 
         // Au moment de marquer les messages comme lus
-function markMessagesAsRead(lastMessageId) {
-    localStorage.setItem('lastSeenMessageId', lastMessageId);
-    socket.emit('markMessagesAsRead');
-}
+        function markMessagesAsRead(lastMessageId) {
+            localStorage.setItem('lastSeenMessageId', lastMessageId);
+            socket.emit('markMessagesAsRead');
+        }
 
-// Au chargement de la page
-function initializeUnreadCounter() {
-    const lastSeen = localStorage.getItem('lastSeenMessageId');
-    if (lastSeen) {
-        // Envoyer cette information au serveur
-        socket.emit('setLastSeen', parseInt(lastSeen));
-    }
-}
+        // Au chargement de la page
+        function initializeUnreadCounter() {
+            const lastSeen = localStorage.getItem('lastSeenMessageId');
+            if (lastSeen) {
+                // Envoyer cette information au serveur
+                socket.emit('setLastSeen', parseInt(lastSeen));
+            }
+        }
 
         function sendGlobalMessage() {
             const input = document.getElementById('globalChatInput');
@@ -752,6 +950,44 @@ function initializeUnreadCounter() {
                 sendGlobalMessage();
             }
         });
+
+        // Recevoir la confirmation que l'on a rejoint en tant que spectateur
+        socket.on('gameSpectated', (data) => {
+            // Stocker l'ID de partie pour savoir qu'on est spectateur
+            localStorage.setItem('spectatingGameId', data.gameId);
+
+            // Rediriger vers la page du jeu
+            window.location.href = '/game?spectator=true';
+        });
+
+        // Initialisation: récupérer périodiquement le nombre de parties en cours
+        document.addEventListener('DOMContentLoaded', function () {
+            // Charger initialement les parties en cours pour le compteur
+            fetchActiveGames();
+
+            // Mettre à jour périodiquement le compteur
+            setInterval(() => {
+                if (!document.getElementById('activeGamesModal').style.display === 'block') {
+                    fetch('/api/active-games')
+                        .then(response => response.json())
+                        .then(data => {
+                            activeGamesData = data;
+                            updateLiveCount();
+                        })
+                        .catch(error => console.error('Erreur:', error));
+                }
+            }, 30000); // Toutes les 30 secondes
+        });
+
+        // Ajouter au gestionnaire d'événements existant
+        document.getElementById('modalBackdrop').onclick = () => {
+            hidePlayers();
+            hideLeaderboard();
+            hideChat();
+            hideActiveGames(); // Ajouter cette ligne
+            closePlayerModal();
+            closeProfileModal();
+        };
 
         // Recevoir les messages
         socket.on('globalChatMessage', function (message) {
@@ -845,37 +1081,37 @@ function initializeUnreadCounter() {
             window.location.href = `/profile/${username}`;
         }
         function handlePlayerClick(playerUsername, isInGame) {
-    selectedPlayer = { 
-        username: playerUsername,
-        isOnline: true,  // Si appelé depuis la liste des joueurs en ligne, le joueur est forcément en ligne
-        inGame: isInGame
-    };
-    
-    const modal = document.getElementById('playerModal');
-    document.getElementById('modalPlayerName').textContent = playerUsername;
+            selectedPlayer = {
+                username: playerUsername,
+                isOnline: true,  // Si appelé depuis la liste des joueurs en ligne, le joueur est forcément en ligne
+                inGame: isInGame
+            };
 
-    // Utiliser currentUsername pour la comparaison
-    const requestGameBtn = document.getElementById('requestGameBtn');
-    if (playerUsername === currentUsername) {
-        requestGameBtn.style.display = 'none';
-    } else {
-        requestGameBtn.style.display = 'block';
-        
-        // Désactiver le bouton si le joueur est en partie
-        if (isInGame) {
-            requestGameBtn.disabled = true;
-            requestGameBtn.classList.add('disabled');
-            requestGameBtn.title = 'Joueur en partie';
-        } else {
-            requestGameBtn.disabled = false;
-            requestGameBtn.classList.remove('disabled');
-            requestGameBtn.title = '';
+            const modal = document.getElementById('playerModal');
+            document.getElementById('modalPlayerName').textContent = playerUsername;
+
+            // Utiliser currentUsername pour la comparaison
+            const requestGameBtn = document.getElementById('requestGameBtn');
+            if (playerUsername === currentUsername) {
+                requestGameBtn.style.display = 'none';
+            } else {
+                requestGameBtn.style.display = 'block';
+
+                // Désactiver le bouton si le joueur est en partie
+                if (isInGame) {
+                    requestGameBtn.disabled = true;
+                    requestGameBtn.classList.add('disabled');
+                    requestGameBtn.title = 'Joueur en partie';
+                } else {
+                    requestGameBtn.disabled = false;
+                    requestGameBtn.classList.remove('disabled');
+                    requestGameBtn.title = '';
+                }
+            }
+
+            modal.style.display = 'block';
+            document.getElementById('modalBackdrop').style.display = 'block';
         }
-    }
-
-    modal.style.display = 'block';
-    document.getElementById('modalBackdrop').style.display = 'block';
-}
 
         function closePlayerModal() {
             document.getElementById('playerModal').style.display = 'none';
@@ -883,21 +1119,21 @@ function initializeUnreadCounter() {
         }
 
         function requestGame() {
-    if (!selectedPlayer) return;
-    
-    // Vérifier si le joueur est en ligne avant d'envoyer la demande
-    if (!selectedPlayer.isOnline) {
-        alert("Ce joueur n'est pas en ligne actuellement.");
-        return;
-    }
-    
-    socket.emit('requestMatch', { toPlayer: selectedPlayer.username });
-    closePlayerModal();
-}
+            if (!selectedPlayer) return;
 
-// Ajouter ce style CSS pour les boutons désactivés
-const styleDisabled = document.createElement('style');
-styleDisabled.textContent = `
+            // Vérifier si le joueur est en ligne avant d'envoyer la demande
+            if (!selectedPlayer.isOnline) {
+                alert("Ce joueur n'est pas en ligne actuellement.");
+                return;
+            }
+
+            socket.emit('requestMatch', { toPlayer: selectedPlayer.username });
+            closePlayerModal();
+        }
+
+        // Ajouter ce style CSS pour les boutons désactivés
+        const styleDisabled = document.createElement('style');
+        styleDisabled.textContent = `
     .game-button.disabled {
         opacity: 0.6;
         cursor: not-allowed;
@@ -905,7 +1141,7 @@ styleDisabled.textContent = `
         color: #999;
     }
 `;
-document.head.appendChild(styleDisabled);
+        document.head.appendChild(styleDisabled);
 
         function showMatchRequest(fromPlayer) {
             const requestText = document.getElementById('requestText');
@@ -925,46 +1161,46 @@ document.head.appendChild(styleDisabled);
 
         // Ajouter cette nouvelle fonction pour gérer les clics sur les joueurs du classement
         function handleLeaderboardPlayerClick(playerUsername) {
-    // Vérifier si le joueur est en ligne et en partie en utilisant les données stockées
-    const onlinePlayer = onlinePlayersData.find(p => p.username === playerUsername);
-    const isOnline = !!onlinePlayer;
-    const isInGame = isOnline && onlinePlayer.inGame;
-    
-    // Si le joueur n'est pas en ligne, nous afficherons quand même les options
-    // mais désactiverons le bouton "Demander un match"
-    selectedPlayer = { 
-        username: playerUsername,
-        isOnline: isOnline
-    };
-    
-    const modal = document.getElementById('playerModal');
-    document.getElementById('modalPlayerName').textContent = playerUsername;
+            // Vérifier si le joueur est en ligne et en partie en utilisant les données stockées
+            const onlinePlayer = onlinePlayersData.find(p => p.username === playerUsername);
+            const isOnline = !!onlinePlayer;
+            const isInGame = isOnline && onlinePlayer.inGame;
 
-    // Utiliser currentUsername pour la comparaison
-    const requestGameBtn = document.getElementById('requestGameBtn');
-    if (playerUsername === currentUsername) {
-        requestGameBtn.style.display = 'none';
-    } else {
-        requestGameBtn.style.display = 'block';
-        
-        // Désactiver le bouton si le joueur n'est pas en ligne ou est en partie
-        if (!isOnline || isInGame) {
-            requestGameBtn.disabled = true;
-            requestGameBtn.classList.add('disabled');
-            requestGameBtn.title = !isOnline ? 'Joueur hors ligne' : 'Joueur en partie';
-        } else {
-            requestGameBtn.disabled = false;
-            requestGameBtn.classList.remove('disabled');
-            requestGameBtn.title = '';
+            // Si le joueur n'est pas en ligne, nous afficherons quand même les options
+            // mais désactiverons le bouton "Demander un match"
+            selectedPlayer = {
+                username: playerUsername,
+                isOnline: isOnline
+            };
+
+            const modal = document.getElementById('playerModal');
+            document.getElementById('modalPlayerName').textContent = playerUsername;
+
+            // Utiliser currentUsername pour la comparaison
+            const requestGameBtn = document.getElementById('requestGameBtn');
+            if (playerUsername === currentUsername) {
+                requestGameBtn.style.display = 'none';
+            } else {
+                requestGameBtn.style.display = 'block';
+
+                // Désactiver le bouton si le joueur n'est pas en ligne ou est en partie
+                if (!isOnline || isInGame) {
+                    requestGameBtn.disabled = true;
+                    requestGameBtn.classList.add('disabled');
+                    requestGameBtn.title = !isOnline ? 'Joueur hors ligne' : 'Joueur en partie';
+                } else {
+                    requestGameBtn.disabled = false;
+                    requestGameBtn.classList.remove('disabled');
+                    requestGameBtn.title = '';
+                }
+            }
+
+            modal.style.display = 'block';
+            document.getElementById('modalBackdrop').style.display = 'block';
         }
-    }
-
-    modal.style.display = 'block';
-    document.getElementById('modalBackdrop').style.display = 'block';
-}
-// Ajouter ce style CSS pour indiquer que les lignes du tableau sont cliquables
-const style = document.createElement('style');
-style.textContent = `
+        // Ajouter ce style CSS pour indiquer que les lignes du tableau sont cliquables
+        const style = document.createElement('style');
+        style.textContent = `
     .player-row {
         cursor: pointer;
         transition: background-color 0.2s;
@@ -973,7 +1209,7 @@ style.textContent = `
         background-color: #f0f7ff;
     }
 `;
-document.head.appendChild(style);
+        document.head.appendChild(style);
 
 
         // Socket.io event listeners
@@ -992,74 +1228,74 @@ document.head.appendChild(style);
                 }
             });
 
-            socket.on("updateOnlinePlayers", (players) => {
-    // Stocker les données des joueurs pour un accès global
-    onlinePlayersData = players || [];
-    
-    const container = document.getElementById('online-players');
-    const playerCount = document.getElementById('online-player-count');
+        socket.on("updateOnlinePlayers", (players) => {
+            // Stocker les données des joueurs pour un accès global
+            onlinePlayersData = players || [];
 
-    // Mettre à jour le compteur sur le bouton
-    playerCount.textContent = players ? players.length : 0;
+            const container = document.getElementById('online-players');
+            const playerCount = document.getElementById('online-player-count');
 
-    if (!players || players.length === 0) {
-        container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
-        return;
-    }
+            // Mettre à jour le compteur sur le bouton
+            playerCount.textContent = players ? players.length : 0;
 
-    container.innerHTML = players
-        .map(player => `
+            if (!players || players.length === 0) {
+                container.innerHTML = '<div class="player-card">Aucun joueur en ligne</div>';
+                return;
+            }
+
+            container.innerHTML = players
+                .map(player => `
         <div class="player-card" onclick="handlePlayerClick('${player.username}', ${player.inGame})">
             <div class="player-info">
                 ${player.username} 
                 ${player.inGame ?
-                    '<span class="status-in-game">(En partie)</span>' :
-                    '<span class="status-available">(Disponible)</span>'}
+                        '<span class="status-in-game">(En partie)</span>' :
+                        '<span class="status-available">(Disponible)</span>'}
             </div>
         </div>
     `).join('');
 
-    document.querySelector('#playersModal h2').textContent =
-        `Joueurs en ligne (${players.length})`;
-});
+            document.querySelector('#playersModal h2').textContent =
+                `Joueurs en ligne (${players.length})`;
+        });
 
-socket.on('updateLeaderboard', (leaderboard) => {
-    const tbody = document.getElementById('leaderboard');
+        socket.on('updateLeaderboard', (leaderboard) => {
+            const tbody = document.getElementById('leaderboard');
 
-    if (!leaderboard || leaderboard.length === 0) {
-        tbody.innerHTML = `
+            if (!leaderboard || leaderboard.length === 0) {
+                tbody.innerHTML = `
         <tr>
             <td colspan="4" class="loading-text">Aucune donnée disponible</td>
         </tr>`;
-        return;
-    }
-
-    tbody.innerHTML = leaderboard
-        .map((player, index) => {
-            // Définir l'icône ou le numéro en fonction du rang
-            let rankDisplay;
-            switch (index) {
-                case 0:
-                    rankDisplay = '<span class="rank-icon">🏆</span>';
-                    break;
-                case 1:
-                    rankDisplay = '<span class="rank-icon">🥈</span>';
-                    break;
-                case 2:
-                    rankDisplay = '<span class="rank-icon">🥉</span>';
-                    break;
-                default:
-                    rankDisplay = `<span class="rank-number">${index + 1}</span>`;
+                return;
             }
 
-            // Vérifier si le joueur est en ligne
-            const isOnline = onlinePlayersData.some(p => p.username === player.username);
-            const onlineIndicator = isOnline 
-                ? '<span class="online-indicator" title="En ligne"></span>' 
-                : '';
+            tbody.innerHTML = leaderboard
+                .map((player, index) => {
+                    // Définir l'icône ou le numéro en fonction du rang
+                    let rankDisplay;
+                    switch (index) {
+                        case 0:
+                            rankDisplay = '<span class="rank-icon">🏆</span>';
+                            break;
+                        case 1:
+                            rankDisplay = '<span class="rank-icon">🥈</span>';
+                            break;
+                        case 2:
+                            rankDisplay = '<span class="rank-icon">🥉</span>';
+                            break;
+                        default:
+                            rankDisplay = `<span class="rank-number">${index + 1}</span>`;
+                    }
 
-            // Rendre la ligne cliquable
-            return `
+                    // Vérifier si le joueur est en ligne
+                    const isOnline = onlinePlayersData.some(p => p.username === player.username);
+                    const onlineIndicator = isOnline
+                        ? '<span class="online-indicator" title="En ligne"></span>'
+                        : '';
+
+                    // Rendre la ligne cliquable
+                    return `
             <tr class="player-row" onclick="handleLeaderboardPlayerClick('${player.username}')">
                 <td>${rankDisplay}</td>
                 <td>${player.username} ${onlineIndicator}</td>
@@ -1067,12 +1303,12 @@ socket.on('updateLeaderboard', (leaderboard) => {
                 <td>${player.games_played || 0}</td>
             </tr>
         `;
-        }).join('');
-});
+                }).join('');
+        });
 
-// Ajouter ce style CSS pour l'indicateur en ligne
-const styleOnlineIndicator = document.createElement('style');
-styleOnlineIndicator.textContent = `
+        // Ajouter ce style CSS pour l'indicateur en ligne
+        const styleOnlineIndicator = document.createElement('style');
+        styleOnlineIndicator.textContent = `
     .online-indicator {
         display: inline-block;
         width: 8px;
@@ -1095,7 +1331,7 @@ styleOnlineIndicator.textContent = `
         animation: pulse 2s infinite;
     }
 `;
-document.head.appendChild(styleOnlineIndicator);
+        document.head.appendChild(styleOnlineIndicator);
 
         socket.on('matchRequest', (data) => {
             showMatchRequest(data.fromPlayer);

@@ -358,6 +358,35 @@ app.get("/api/profile/:username", (req, res) => {
   );
 });
 
+// Ajoutez une route pour récupérer les parties en cours
+app.get('/api/active-games', (req, res) => {
+  if (!req.session || !req.session.loggedin) {
+    return res.status(401).json({ error: 'Non authentifié' });
+  }
+  
+  const activeGames = [];
+  
+  for (const [gameId, game] of Object.entries(games)) {
+    // Ne pas inclure les parties privées
+    if (!game.gameState.isPublic) continue;
+    
+    // S'assurer qu'il y a au moins 2 joueurs (partie en cours)
+    if (game.players.length >= 2) {
+      activeGames.push({
+        id: gameId,
+        player1: game.gameState.player1Name,
+        player2: game.gameState.player2Name,
+        scoreRed: game.gameState.scoreRed,
+        scoreBlue: game.gameState.scoreBlue,
+        spectatorCount: game.spectators.length,
+        inProgress: true
+      });
+    }
+  }
+  
+  res.json(activeGames);
+});
+
 
 app.get("/login", (req, res) => {
   res.sendFile(__dirname + "/public/login.html");
@@ -537,6 +566,59 @@ io.on("connection", (socket) => {
     );
   });
   
+  socket.on('spectateGame', (gameId) => {
+    console.log(`Utilisateur ${socket.request.session.username} tente de rejoindre la partie ${gameId} en tant que spectateur`);
+    
+    if (!socket.request.session?.loggedin) {
+      socket.emit('notAuthenticated');
+      return;
+    }
+    
+    if (!games[gameId]) {
+      socket.emit('gameNotFound');
+      return;
+    }
+    
+    const game = games[gameId];
+    const username = socket.request.session.username;
+    
+    // Vérifier si l'utilisateur est déjà un spectateur
+    const existingSpectator = game.spectators.find(s => s.username === username);
+    if (existingSpectator) {
+      existingSpectator.socketId = socket.id;
+    } else {
+      // Ajouter l'utilisateur aux spectateurs
+      game.spectators.push({ 
+        username: username,
+        socketId: socket.id 
+      });
+      
+      // Notifier les joueurs et autres spectateurs qu'un nouveau spectateur a rejoint
+      io.to(gameId).emit('spectatorJoined', {
+        spectatorCount: game.spectators.length,
+        username: username
+      });
+    }
+    
+    // Rejoindre la room Socket.IO pour cette partie
+    socket.join(gameId);
+    
+    // Envoyer l'état actuel du jeu au spectateur
+    socket.emit('gameSpectated', {
+      gameState: game.gameState,
+      gameId: gameId
+    });
+    
+    // Mettre à jour le joueur comme étant en ligne mais pas "en partie"
+    if (onlinePlayers.has(socket.id)) {
+      const player = onlinePlayers.get(socket.id);
+      player.spectating = gameId;
+      onlinePlayers.set(socket.id, player);
+      io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
+    }
+  });
+
+
   // Ajouter cette fonction pour envoyer le nombre de messages non lus
   socket.on('getUnreadMessageCount', () => {
     if (!socket.request.session?.username) return;
@@ -1218,6 +1300,7 @@ function queryAsync(sql, values) {
 
     games[gameId] = {
       players: [],
+      spectators: [], // Nouveau tableau pour les spectateurs
       gameState: {
         dots: [],
         scoreRed: 0,
@@ -1233,6 +1316,7 @@ function queryAsync(sql, values) {
           commonReflectionTime: 30,
           isReflectionPhase: true,
         },
+        isPublic: true, // Par défaut, les parties sont publiques
       },
     };
 
@@ -1265,6 +1349,7 @@ function queryAsync(sql, values) {
     if (!games[gameId]) {
       games[gameId] = {
         players: [],
+        spectators: [], // Ajoutez cette ligne pour initialiser le tableau des spectateurs
         gameState: {
           dots: [],
           scoreRed: 0,
@@ -1311,11 +1396,21 @@ function queryAsync(sql, values) {
         ),
       };
 
-      socket.emit("gameJoined", {
-        playerType: existingPlayer.type,
-        gameState: formattedGameState,
-        gameId: gameId,
-      });
+       // Assurez-vous que l'état complet du jeu est envoyé, y compris les timers actuels
+    socket.emit("gameJoined", {
+      playerType: existingPlayer.type,
+      gameState: {
+        ...games[gameId].gameState,
+        // Envoyez explicitement l'état actuel des timers
+        timers: {
+          player1Time: games[gameId].gameState.timers.player1Time,
+          player2Time: games[gameId].gameState.timers.player2Time,
+          commonReflectionTime: games[gameId].gameState.timers.commonReflectionTime,
+          isReflectionPhase: games[gameId].gameState.timers.isReflectionPhase
+        }
+      },
+      gameId: gameId,
+    });
       return;
     }
 
@@ -1486,41 +1581,54 @@ function queryAsync(sql, values) {
   });
   // Gestion de la déconnexion
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+  console.log("User disconnected:", socket.id);
 
-    const playerInfo = onlinePlayers.get(socket.id);
-    if (!playerInfo) return;
+  const playerInfo = onlinePlayers.get(socket.id);
+  if (!playerInfo) return;
 
-    const username = playerInfo.username;
+  const username = playerInfo.username;
 
-    // Créer un timeout pour la déconnexion
-    const timeout = setTimeout(() => {
-      // Vérifier si le joueur n'est pas déjà reconnecté
-      const reconnected = Array.from(onlinePlayers.values()).some(
-        (p) => p.username === username && p.id !== socket.id
-      );
+  // Créer un timeout pour la déconnexion
+  const timeout = setTimeout(() => {
+    // Vérifier si le joueur n'est pas déjà reconnecté
+    const reconnected = Array.from(onlinePlayers.values()).some(
+      (p) => p.username === username && p.id !== socket.id
+    );
 
-      if (!reconnected) {
-        onlinePlayers.delete(socket.id);
-        io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
+    if (!reconnected) {
+      onlinePlayers.delete(socket.id);
+      io.emit("updateOnlinePlayers", Array.from(onlinePlayers.values()));
 
-        // Gérer la déconnexion dans les parties
-        for (const [gameId, game] of Object.entries(games)) {
-          const playerIndex = game.players.findIndex((p) => p.id === socket.id);
-          if (playerIndex !== -1) {
-            game.players.splice(playerIndex, 1);
-            if (game.players.length === 1) {
-              io.to(gameId).emit("playerDisconnected");
-            } else if (game.players.length === 0) {
-              delete games[gameId];
-            }
+      // Gérer la déconnexion dans les parties
+      for (const [gameId, game] of Object.entries(games)) {
+        // Vérifier si c'est un joueur
+        const playerIndex = game.players.findIndex((p) => p.id === socket.id);
+        if (playerIndex !== -1) {
+          game.players.splice(playerIndex, 1);
+          if (game.players.length === 1) {
+            io.to(gameId).emit("playerDisconnected");
+          } else if (game.players.length === 0) {
+            delete games[gameId];
           }
         }
+        
+        // Vérifier si c'est un spectateur
+        const spectatorIndex = game.spectators.findIndex(s => s.socketId === socket.id);
+        if (spectatorIndex !== -1) {
+          game.spectators.splice(spectatorIndex, 1);
+          
+          // Notifier les autres utilisateurs
+          io.to(gameId).emit('spectatorLeft', {
+            spectatorCount: game.spectators.length,
+            username: username
+          });
+        }
       }
-    }, 5000); // 5 secondes de délai
+    }
+  }, 5000); // 5 secondes de délai
 
-    userDisconnectTimeouts.set(username, timeout);
-  });
+  userDisconnectTimeouts.set(username, timeout);
+});
 
   // Gestion de la tentative de reconnexion
   socket.on("reconnect_attempt", () => {

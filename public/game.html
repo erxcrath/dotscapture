@@ -8,7 +8,42 @@
 
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    
+    .spectator-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-color: rgba(255, 0, 0, 0.8);
+  color: white;
+  padding: 8px 15px;
+  text-align: center;
+  font-weight: bold;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.spectator-banner .leave-btn {
+  background-color: white;
+  color: #ff0000;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.spectator-info {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+}
     .modal {
       position: fixed;
       top: 0;
@@ -326,10 +361,14 @@
     }
 
     // Rejoindre automatiquement si on a déjà un ID
-    if (gameId && playerType && !gameStarted) {
-      console.log('Rejoindre automatiquement la partie:', gameId);
-      joinGame();
-    }
+    if (gameId) {
+  console.log('Rejoindre automatiquement la partie:', gameId);
+  if (isSpectator) {
+    socket.emit('spectateGame', gameId);
+  } else {
+    socket.emit('joinGame', gameId);
+  }
+}
 
     // Événements Socket.IO
     socket.on('gameJoined', (data) => {
